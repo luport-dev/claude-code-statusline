@@ -144,7 +144,8 @@ Requires `git` and `jq`.
 **Setup script:**
 
 ```bash
-./setup/linux/install.sh
+./setup/linux/install.sh      # install
+./setup/linux/uninstall.sh    # uninstall
 ```
 
 **Manual installation:**
@@ -161,7 +162,8 @@ Requires `git` and `jq` (install via Homebrew: `brew install jq`).
 **Setup script:**
 
 ```bash
-./setup/macos/install.sh
+./setup/macos/install.sh      # install
+./setup/macos/uninstall.sh    # uninstall
 ```
 
 **Manual installation:**
@@ -179,12 +181,14 @@ Requires `git` and PowerShell 5.1+ (preinstalled on Windows 10/11).
 
 ```cmd
 setup\win\install.cmd
+setup\win\uninstall.cmd
 ```
 
 Or directly in PowerShell:
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File setup\win\install.ps1
+powershell -ExecutionPolicy Bypass -File setup\win\uninstall.ps1
 ```
 
 **Manual installation:**
@@ -204,10 +208,9 @@ Copy [`scripts/win/statusline.ps1`](scripts/win/statusline.ps1) and [`scripts/wi
 
 </details>
 
+</br>
 
-**Finally**
-
-Restart Claude Code — the status line will be loaded on next startup.
+> **Note:** Restart Claude Code — the status line will be loaded on **next startup**.
 
 
 # License
