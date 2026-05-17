@@ -1,0 +1,36 @@
+{
+  "name": "claude-status-line-extension",
+  "displayName": "Claude Status Line",
+  "description": "Display Claude Code status in VS Code status bar",
+  "version": "0.1.0",
+  "publisher": "luport-dev",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/luport-dev/Claude-Status-Line.git"
+  },
+  "engines": {
+    "vscode": "^1.90.0"
+  },
+  "categories": ["Other"],
+  "activationEvents": ["onStartupFinished"],
+  "main": "./dist/extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "claudeStatusLine.selectSession",
+        "title": "Claude Status Line: Select Session"
+      }
+    ]
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run compile",
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./"
+  },
+  "devDependencies": {
+    "@types/vscode": "^1.90.0",
+    "@types/node": "^20.0.0",
+    "typescript": "^5.1.6"
+  }
+}
