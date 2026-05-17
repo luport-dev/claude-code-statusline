@@ -1,6 +1,5 @@
-# Claude Code CLI Status Line
 
-*[Deutsche Version](readme_de.md)*
+# Claude Code CLI Status Line
 
 A two-line, colored status line for the [Claude Code CLI](https://claude.ai/code) that shows all relevant session data at a glance: the current model (color-coded by type), the effort level, context usage, and rate limits for both the 5-hour and 7-day windows. The second line displays the working directory, the active git branch, and — if applicable — the active worktree.
 
@@ -177,3 +176,7 @@ The scripts can be freely edited:
 ## How it Works
 
 Claude Code passes a JSON object to the status line via stdin. The script reads it, determines the git branch via `git branch --show-current` in the current working directory, and returns the formatted, colored output — Linux/macOS via `jq`, Windows natively via PowerShell `ConvertFrom-Json`.
+
+## License
+
+This project is licensed under the MIT License. See [LICENSE](LICENSE) for details.
