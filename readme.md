@@ -1,12 +1,24 @@
 
 # Claude Code CLI Status Line
 
-A two-line, colored status line for the [Claude Code CLI](https://claude.ai/code) that shows all relevant session data at a glance: the current model (color-coded by type), the effort level, context usage, and rate limits for both the 5-hour and 7-day windows. The second line displays the working directory, the active git branch, and — if applicable — the active worktree.
+> ⚠️ **Beta**  
+  This project is currently in beta. There is **no guarantee** that the scripts work correctly on every system or configuration.  
+  *Use at your own risk and feel free to report issues!*
+
+## What is it?
+
+A two-line, colored status line for the **[Claude Code CLI](https://claude.ai/code)** that shows all relevant session data at a glance: 
+- the current model (color-coded by type)
+- the effort level
+- context usage
+- rate limits for both the 5-hour and 7-day windows
+- the working directory
+- the active git branch
+- the active worktree (if applicable)
 
 Colors automatically shift from green to yellow to red as defined thresholds are crossed, making critical states immediately visible without interrupting Claude's output.
 
-
-# How it Works
+## How it Works
 
 Claude Code passes a JSON object to the status line via stdin. The script reads it, determines the git branch via `git branch --show-current` in the current working directory, and returns the formatted, colored output — Linux/macOS via `jq`, Windows natively via PowerShell `ConvertFrom-Json`.
 
@@ -19,7 +31,7 @@ Claude Code passes a JSON object to the status line via stdin. The script reads 
 
 ![Status line preview Opus](screenshots/preview_opus.png)
 
-> *Example values for illustrating the color stages — context:73% (warning), 5h:92% (critical), 5h:0% (low/green).*
+> *Example values for illustrating the color stages.*
 
 **Line 1** — Model (colored by type), effort, thinking status, context usage, rate limits (5h / 7d)<br>
 **Line 2** — Working directory, git branch, active worktree (in bronze tones)
@@ -31,16 +43,16 @@ Colors automatically shift green → yellow → red depending on usage.
 
 | Element | Color |
 |---------|-------|
-| Opus | Gold |
-| Sonnet | Light blue |
-| Haiku | White |
-| thinking:on | Teal |
-| thinking:off | Dimmed gray |
-| effort / ctx / 5h / 7d (low) | Green |
-| effort / ctx / 5h / 7d (medium) | Yellow |
-| effort / ctx / 5h / 7d (high) | Red |
-| dir / branch / worktree labels | Rust brown |
-| dir / branch / worktree values | Warm bronze |
+| Opus | 🟡 Gold |
+| Sonnet | 🔵 Light blue |
+| Haiku | ⚪ White |
+| thinking:on | 🟢 Teal |
+| thinking:off | ⚫ Dimmed gray |
+| effort / ctx / 5h / 7d (low) | 🟢 Green |
+| effort / ctx / 5h / 7d (medium) | 🟡 Yellow |
+| effort / ctx / 5h / 7d (high) | 🔴 Red |
+| dir / branch / worktree labels | 🟤 Rust brown |
+| dir / branch / worktree values | 🟠 Warm bronze |
 
 
 ## Thresholds
@@ -56,7 +68,7 @@ Colors automatically shift green → yellow → red depending on usage.
 
 The scripts can be freely edited:
 
-- **Change colors**: Adjust `model_color`, `effort_color`, and `color` (or `Model-Color`, `Effort-Color`, `Color-Threshold` in PowerShell). Truecolor (`38;2;R;G;B`) or [256-color ANSI codes](https://www.ditig.com/256-colors-cheat-sheet).
+- **Change colors**: Adjust `model_color`, `effort_color`, and `color` (or `Model-Color`, `Effort-Color`, `Color-Threshold` in PowerShell). Truecolor (`38;2;R;G;B`) or [256-color ANSI codes](https://www.ditig.com/256-colors-cheat-sheet) can be used for more variety.
 - **Remove fields**: Delete individual entries from the array or line composition.
 - **Thresholds**: Adjust the values in the `color` calls (`warn`, `crit`).
 - **Single-line**: Remove the second block (line 2).
@@ -129,7 +141,8 @@ Verify: `git --version` should output a version number.
 
 # Installing the Status Line
 
-The fastest way: clone the repo and run the setup script for your platform. It copies the right files to `~/.claude/` and merges the `statusLine` entry into `settings.json` (existing files are backed up as `.bak.<timestamp>`).
+The fastest way: **clone the repo** and **run the setup script** for your platform.  
+It copies the right files to `~/.claude/` and merges the `statusLine` entry into `settings.json` (existing files are backed up as `.bak.<timestamp>`).
 
 ```bash
 git clone https://github.com/luport-dev/Claude-Code-CLI-StatusLine.git
@@ -207,10 +220,10 @@ Copy [`scripts/win/statusline.ps1`](scripts/win/statusline.ps1) and [`scripts/wi
 > Replace `YOUR_USERNAME` with your Windows username. Backslashes in the JSON path must be doubled.
 
 </details>
-
 </br>
 
-> **Note:** Restart Claude Code — the status line will be loaded on **next startup**.
+
+> *Restart Claude Code — the status line will be loaded on **next startup**.*
 
 
 # License
