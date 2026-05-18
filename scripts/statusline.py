@@ -170,12 +170,7 @@ def main() -> None:
 
     # --- line 2 ----------------------------------------------------------
     term_cols = shutil.get_terminal_size(fallback=(120, 24)).columns
-    # 80% der Terminalbreite, abzüglich Labels ("dir:", "branch:", "worktree:")
-    # und drei Separatoren (" | " = 3 Zeichen je)
-    LABELS_WIDTH = len("dir:") + len("branch:") + len("worktree:")  # 17
-    SEPS_WIDTH   = 3 * 3                                              # 9 (" | " x3, incl. trailing)
-    budget       = max(9, int(term_cols * 0.80) - LABELS_WIDTH - SEPS_WIDTH)
-    n            = max(3, budget // 3)
+    n         = max(3, int(term_cols * 0.80) // 3)
 
     def trunc(value: str) -> str:
         return f"…{value[-n:]}" if len(value) > n else value
