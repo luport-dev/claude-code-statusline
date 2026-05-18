@@ -102,6 +102,14 @@ def main_menu(stdscr: "curses.window", config: dict) -> tuple[dict, bool]:
 
         key = stdscr.getch()
         if key in (ord("q"), ord("Q")):
+            stdscr.clear()
+            draw_box(stdscr, "Claude Code Status Line — Configuration")
+            msg = "Configuration saved. Restart Claude Code to apply changes."
+            stdscr.addstr(h // 2, max(2, (w - len(msg)) // 2), msg)
+            hint2 = "Press any key to exit"
+            stdscr.addstr(h // 2 + 2, max(2, (w - len(hint2)) // 2), hint2, curses.A_DIM)
+            stdscr.refresh()
+            stdscr.getch()
             return config, True
         elif key == 27:  # Esc
             return config, False
