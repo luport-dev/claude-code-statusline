@@ -148,7 +148,7 @@ def main() -> None:
     if is_haiku:
         effort_segment = f"{DIM_GRAY}effort:{RESET}{DIM_GRAY}n/a{RESET}"
     else:
-        effort_segment = f"{label('effort', ec)}{ec}{effort}{RESET}"
+        effort_segment = f"{ec}effort:{RESET}{ec}{effort}{RESET}"
 
     if thinking_on:
         thinking_segment = f"{THINKING_ON_COLOR}thinking:on{RESET}"
@@ -163,9 +163,9 @@ def main() -> None:
         f"{mc}{model}{RESET}",
         effort_segment,
         thinking_segment,
-        f"{label('ctx', ctx_c)}{ctx_c}{ctx}%{RESET}",
-        f"{label('5h',  five_c)}{five_c}{five}%{RESET}",
-        f"{label('7d',  week_c)}{week_c}{week}%{RESET}",
+        f"{ctx_c}ctx:{RESET}{ctx_c}{ctx}%{RESET}",
+        f"{five_c}5h:{RESET}{five_c}{five}%{RESET}",
+        f"{week_c}7d:{RESET}{week_c}{week}%{RESET}",
     ])
 
     # --- line 2 ----------------------------------------------------------
