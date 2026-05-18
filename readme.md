@@ -20,7 +20,7 @@ Colors automatically shift from green to yellow to red as defined thresholds are
 
 ## How it Works
 
-Claude Code passes a JSON object to the status line via stdin. The script reads it, determines the git branch via `git branch --show-current` in the current working directory, and returns the formatted, colored output — Linux/macOS via `jq`, Windows natively via PowerShell `ConvertFrom-Json`.
+Claude Code passes a JSON object to the status line via stdin. The script reads it, determines the git branch via `git branch --show-current` in the current working directory, and returns the formatted, colored output — Linux/macOS via Bash + `jq`, Windows via Python 3 (standard library only, no extra packages required).
 
 
 ## Examples
@@ -79,8 +79,7 @@ The scripts can be freely edited:
 | File | Platform |
 |------|----------|
 | [`scripts/linux/statusline.sh`](scripts/linux/statusline.sh) | Linux / macOS (Bash + `jq`) |
-| [`scripts/win/statusline.ps1`](scripts/win/statusline.ps1) | Windows (PowerShell, no `jq` required) |
-| [`scripts/win/statusline.cmd`](scripts/win/statusline.cmd) | Windows wrapper that runs `statusline.ps1` hidden |
+| [`scripts/win/statusline.py`](scripts/win/statusline.py) | Windows (Python 3, standard library only) |
 
 
 # Requirements
@@ -89,7 +88,7 @@ The scripts can be freely edited:
 |----------|--------------|
 | Linux | `git`, `jq` |
 | macOS | `git`, `jq` |
-| Windows | `git`, PowerShell 5.1+ (preinstalled) or PowerShell 7 (`pwsh`) |
+| Windows | `git`, Python 3.8+ (no pip packages required) |
 
 <details>
 <summary><strong>Linux</strong> — Installing Git and <code>jq</code></summary>
@@ -123,17 +122,20 @@ Verify: `git --version` and `jq --version` should both output a version number.
 </details>
 
 <details>
-<summary><strong>Windows</strong> — Installing Git</summary>
+<summary><strong>Windows</strong> — Installing Git and Python</summary>
 
-> `jq` is not required on Windows — the PowerShell variant works without it.
+> `jq` is not required on Windows — the Python variant uses only the standard library.
 
-Download and run the installer from [git-scm.com](https://git-scm.com/download/win) — Git ships with Git Bash. Alternatively via [winget](https://learn.microsoft.com/en-us/windows/package-manager/winget/):
+Install Git from [git-scm.com](https://git-scm.com/download/win) and Python 3 from [python.org](https://www.python.org/downloads/windows/). Alternatively via [winget](https://learn.microsoft.com/en-us/windows/package-manager/winget/):
 
 ```powershell
 winget install --id Git.Git -e
+winget install --id Python.Python.3.12 -e
 ```
 
-Verify: `git --version` should output a version number.
+> When installing Python, make sure **"Add python.exe to PATH"** is checked.
+
+Verify: `git --version` and `python --version` (or `py --version`) should both output a version number.
 
 </details>
 <br>
@@ -188,7 +190,7 @@ Copy [`scripts/linux/statusline.sh`](scripts/linux/statusline.sh) to `~/.claude/
 <details>
 <summary><strong>Windows</strong></summary>
 
-Requires `git` and PowerShell 5.1+ (preinstalled on Windows 10/11).
+Requires `git` and Python 3 in `PATH`.
 
 **Setup script** — in a regular terminal (CMD):
 
@@ -197,27 +199,22 @@ setup\win\install.cmd
 setup\win\uninstall.cmd
 ```
 
-Or directly in PowerShell:
-
-```powershell
-powershell -ExecutionPolicy Bypass -File setup\win\install.ps1
-powershell -ExecutionPolicy Bypass -File setup\win\uninstall.ps1
-```
+The install script copies `statusline.py` to `%USERPROFILE%\.claude\statusline.py` and merges the `statusLine` entry into `settings.json` (existing files are backed up as `.bak.<timestamp>`).
 
 **Manual installation:**
 
-Copy [`scripts/win/statusline.ps1`](scripts/win/statusline.ps1) and [`scripts/win/statusline.cmd`](scripts/win/statusline.cmd) together to `%USERPROFILE%\.claude\`. In `~/.claude/settings.json`, reference the `.cmd` file under `statusLine` as a command (type `command`):
+Copy [`scripts/win/statusline.py`](scripts/win/statusline.py) to `%USERPROFILE%\.claude\statusline.py`. In `~/.claude/settings.json`, reference it under `statusLine`:
 
 ```json
 {
   "statusLine": {
     "type": "command",
-    "command": "C:\\Users\\YOUR_USERNAME\\.claude\\statusline.cmd"
+    "command": "python C:/Users/YOUR_USERNAME/.claude/statusline.py"
   }
 }
 ```
 
-> Replace `YOUR_USERNAME` with your Windows username. Backslashes in the JSON path must be doubled.
+> Replace `YOUR_USERNAME` with your Windows username. **Use forward slashes** in the path — Claude Code routes status line commands through Git Bash on Windows when present, and backslashes get eaten as escape characters. See the [official docs](https://code.claude.com/docs/en/statusline#windows-configuration).
 
 </details>
 </br>
