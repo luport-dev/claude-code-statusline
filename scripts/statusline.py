@@ -52,6 +52,14 @@ def to_int(value, default: int = 0) -> int:
         return default
 
 
+def fmt_tokens(n: int) -> str:
+    if n >= 1_000_000:
+        return f"{n/1_000_000:.1f}M"
+    if n >= 1_000:
+        return f"{n/1_000:.1f}k"
+    return str(n)
+
+
 def color_threshold(value: float, warn: float, crit: float) -> str:
     if value >= crit:
         return f"{ESC}[31m"  # red
@@ -134,6 +142,7 @@ def main() -> None:
     model    = dig(data, "model.display_name", "") or ""
     effort   = dig(data, "effort.level", "low") or "low"
     ctx      = to_int(dig(data, "context_window.used_percentage"))
+    tkn      = to_int(dig(data, "context_window.total_input_tokens"))
     five     = to_int(dig(data, "rate_limits.five_hour.used_percentage"))
     week     = to_int(dig(data, "rate_limits.seven_day.used_percentage"))
 
@@ -164,6 +173,7 @@ def main() -> None:
         effort_segment,
         thinking_segment,
         f"{ctx_c}ctx:{RESET}{ctx_c}{ctx}%{RESET}",
+        f"{ctx_c}tkn:{RESET}{ctx_c}{fmt_tokens(tkn)}{RESET}",
         f"{five_c}5h:{RESET}{five_c}{five}%{RESET}",
         f"{week_c}7d:{RESET}{week_c}{week}%{RESET}",
     ])
