@@ -39,7 +39,7 @@ if exist "%DEST%" (
     echo    skipped: %DEST% ^(not found^)
 )
 
-%PY% "%SCRIPT_DIR%_settings.py" uninstall
+%PY% "%SCRIPT_DIR%.._settings.py" uninstall
 
 echo ^>^> Done. Restart Claude Code.
 endlocal

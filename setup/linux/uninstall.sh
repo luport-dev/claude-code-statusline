@@ -1,31 +1,38 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 DEST_DIR="$HOME/.claude"
-DEST="$DEST_DIR/statusline.sh"
-SETTINGS="$DEST_DIR/settings.json"
+DEST="$DEST_DIR/statusline.py"
 
 echo ">> Claude Code Status Line — Linux Uninstall"
 
+# --- Python prüfen und ggf. installieren --------------------------------
+PY=""
+command -v python3 >/dev/null 2>&1 && PY="python3"
+if [[ -z "$PY" ]]; then
+    echo
+    echo "   Python 3 wurde nicht gefunden."
+    read -r -p "   Python 3 installieren? Paketmanager-Befehl eingeben oder Enter zum Abbrechen: " INSTALL_CMD
+    if [[ -n "$INSTALL_CMD" ]]; then
+        eval "$INSTALL_CMD"
+        command -v python3 >/dev/null 2>&1 && PY="python3"
+    fi
+fi
+if [[ -z "$PY" ]]; then
+    echo "ERROR: Python 3 wird benoetigt. Uninstall abgebrochen." >&2
+    echo "       z.B.: sudo apt install python3  oder  sudo dnf install python3" >&2
+    exit 1
+fi
+
+# --- statusline.py entfernen --------------------------------------------
 if [[ -f "$DEST" ]]; then
-  rm -f "$DEST"
-  echo "   removed: $DEST"
+    rm -f "$DEST"
+    echo "   removed: $DEST"
 else
-  echo "   skipped: $DEST (not found)"
+    echo "   skipped: $DEST (not found)"
 fi
 
-if [[ -f "$SETTINGS" ]]; then
-  if ! command -v jq >/dev/null 2>&1; then
-    echo "WARN: 'jq' not installed — leaving $SETTINGS untouched. Remove the 'statusLine' key manually." >&2
-  else
-    cp "$SETTINGS" "$SETTINGS.bak.$(date +%s)"
-    tmp="$(mktemp)"
-    jq 'del(.statusLine)' "$SETTINGS" > "$tmp"
-    mv "$tmp" "$SETTINGS"
-    echo "   updated: $SETTINGS (statusLine removed)"
-  fi
-else
-  echo "   skipped: $SETTINGS (not found)"
-fi
-
+# --- settings.json bereinigen -------------------------------------------
+"$PY" "$SCRIPT_DIR/../_settings.py" uninstall
 echo ">> Done. Restart Claude Code."

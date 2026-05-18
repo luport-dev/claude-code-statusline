@@ -1,16 +1,19 @@
 #!/usr/bin/env python3
-"""Merge or remove the statusLine entry in %USERPROFILE%\\.claude\\settings.json.
+"""Merge or remove the statusLine entry in ~/.claude/settings.json.
 
-Used by install.cmd and uninstall.cmd. A timestamped backup is always written
-when an existing file is modified.
+Used by install.cmd / install.sh and uninstall.cmd / uninstall.sh.
+A timestamped backup is always written when an existing file is modified.
 
 Usage:
-    python _settings.py install
-    python _settings.py uninstall
+    python  _settings.py install
+    python  _settings.py uninstall
+    python3 _settings.py install
+    python3 _settings.py uninstall
 """
 from __future__ import annotations
 
 import json
+import platform
 import shutil
 import sys
 import time
@@ -23,11 +26,11 @@ SCRIPT = CLAUDE_DIR / "statusline.py"
 
 
 def status_line_command() -> str:
-    # Forward slashes: Git Bash (the shell Claude Code routes through on
-    # Windows when present) treats backslashes as escapes and will eat them.
-    # See https://code.claude.com/docs/en/statusline#windows-configuration
-    script_posix = str(SCRIPT).replace("\\", "/")
-    return f"python {script_posix}"
+    if platform.system() == "Windows":
+        # Forward slashes: Git Bash treats backslashes as escapes.
+        script_posix = str(SCRIPT).replace("\\", "/")
+        return f"python {script_posix}"
+    return f"python3 {SCRIPT}"
 
 
 def load_settings() -> dict:

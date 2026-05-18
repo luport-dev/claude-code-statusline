@@ -5,7 +5,7 @@ echo ^>^> Claude Code Status Line - Windows Setup
 
 set "SCRIPT_DIR=%~dp0"
 set "REPO_ROOT=%SCRIPT_DIR%..\.."
-set "SRC=%REPO_ROOT%\scripts\win\statusline.py"
+set "SRC=%REPO_ROOT%\scripts\statusline.py"
 set "DEST_DIR=%USERPROFILE%\.claude"
 set "DEST=%DEST_DIR%\statusline.py"
 
@@ -59,7 +59,7 @@ copy /Y "%SRC%" "%DEST%" >nul || (
 echo    installed: %DEST%
 
 rem --- Merge statusLine entry into settings.json ---------------------
-%PY% "%SCRIPT_DIR%_settings.py" install
+%PY% "%SCRIPT_DIR%.._settings.py" install
 if errorlevel 1 (
     echo ERROR: Failed to update settings.json
     exit /b 1
