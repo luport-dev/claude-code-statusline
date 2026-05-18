@@ -38,4 +38,12 @@ else
 fi
 echo "   updated:   $SETTINGS"
 
+# Default-Config anlegen (nur bei Erstinstallation)
+CONFIG_DEST="$HOME/.claude/statusline_config.json"
+CONFIG_SRC="$REPO_ROOT/setup/default_config.json"
+if [[ ! -f "$CONFIG_DEST" && -f "$CONFIG_SRC" ]]; then
+  cp "$CONFIG_SRC" "$CONFIG_DEST"
+  echo "   installed: $CONFIG_DEST (default config)"
+fi
+
 echo ">> Done. Restart Claude Code to load the status line."

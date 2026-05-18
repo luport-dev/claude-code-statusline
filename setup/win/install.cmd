@@ -71,5 +71,13 @@ if errorlevel 1 (
     exit /b 1
 )
 
+rem --- Default-Config anlegen (nur bei Erstinstallation) ----------------
+set "CONFIG_DEST=%USERPROFILE%\.claude\statusline_config.json"
+set "CONFIG_SRC=%REPO_ROOT%\setup\default_config.json"
+if not exist "%CONFIG_DEST%" if exist "%CONFIG_SRC%" (
+    copy /Y "%CONFIG_SRC%" "%CONFIG_DEST%" >nul
+    echo    installed: %CONFIG_DEST% (default config^)
+)
+
 echo ^>^> Done. Restart Claude Code to load the status line.
 endlocal

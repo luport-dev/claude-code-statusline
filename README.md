@@ -62,15 +62,15 @@ Default thresholds (configurable via `configure`):
 
 | Metric | Yellow at | Red at |
 |--------|-----------|--------|
-| ctx | 70% | 90% |
-| tkn | 70% | 90% |
-| 5h rate limit | 70% | 90% |
-| 7d rate limit | 50% | 80% |
+| ctx | 60% | 80% |
+| tkn | 60% | 80% |
+| 5h rate limit | 60% | 80% |
+| 7d rate limit | 60% | 80% |
 
 
 ## Configuration
 
-Run the interactive configuration tool to customize thresholds and line 2 visibility:
+Run the interactive configuration tool to customize thresholds and element visibility:
 
 ```bash
 # Linux
@@ -85,9 +85,67 @@ Run the interactive configuration tool to customize thresholds and line 2 visibi
 setup\win\configure.cmd
 ```
 
-The TUI lets you adjust warning/critical thresholds for each metric and toggle which fields appear on line 2 (dir, branch, worktree). Settings are saved to `~/.claude/statusline_config.json`.
+The TUI lets you adjust warning/critical thresholds for each metric and toggle which elements are visible on line 1 (model, effort, thinking, ctx, tkn, 5h, 7d) and line 2 (dir, branch, worktree). Settings are saved to `~/.claude/statusline_config.json`.
 
 > On Windows, `windows-curses` is installed automatically by `install.cmd`.
+
+**Main menu**
+```
+┌──────────────── Claude Code Status Line — Configuration ──────────────────┐
+│                                                                           │
+│  > 1. Thresholds                                                          │
+│    2. Line 1 visibility                                                   │
+│    3. Line 2 visibility                                                   │
+│                                                                           │
+│             config: ~/.claude/statusline_config.json                      │
+│                                                                           │
+│  [↑↓] navigate  [Enter] open  [q] save & quit  [Esc] quit without saving  │
+└───────────────────────────────────────────────────────────────────────────┘
+```
+
+**Thresholds**
+```
+┌──────────────────────────────────────────────────────────────────────┐
+│                              Thresholds                              │
+│                                                                      │
+│  ctx   warn: [ 60]%          crit: [ 80]%                            │
+│  tkn   warn: [ 60]%          crit: [ 80]%                            │
+│  5h    warn: [ 60]%          crit: [ 80]%                            │
+│  7d    warn: [ 60]%          crit: [ 80]%                            │
+│                                                                      │
+│  [↑↓] rows  [←→] fields  [0-9] edit  [Backspace] clear  [Esc] back   │
+└──────────────────────────────────────────────────────────────────────┘
+```
+
+**Line 1 visibility**
+```
+┌───────────────────────────────────────────────────┐
+│                  Line 1 Visibility                │
+│                                                   │
+│  [x] model                                        │
+│  [x] effort                                       │
+│  [x] thinking                                     │
+│  [x] ctx                                          │
+│  [x] tkn                                          │
+│  [x] 5h                                           │
+│  [x] 7d                                           │
+│                                                   │
+│  [↑↓] navigate  [Space/Enter] toggle  [Esc] back  │
+└───────────────────────────────────────────────────┘
+```
+
+**Line 2 visibility**
+```
+┌───────────────────────────────────────────────────┐
+│                  Line 2 Visibility                │
+│                                                   │
+│  [x] dir                                          │
+│  [x] branch                                       │
+│  [ ] worktree                                     │
+│                                                   │
+│  [↑↓] navigate  [Space/Enter] toggle  [Esc] back  │
+└───────────────────────────────────────────────────┘
+```
 
 
 ## Files
@@ -97,6 +155,7 @@ The TUI lets you adjust warning/critical thresholds for each metric and toggle w
 | [`scripts/statusline.py`](scripts/statusline.py) | Status line script (all platforms) |
 | [`setup/_settings.py`](setup/_settings.py) | Shared settings helper |
 | [`setup/configure.py`](setup/configure.py) | Interactive configuration TUI |
+| [`setup/default_config.json`](setup/default_config.json) | Default configuration (copied on first install) |
 | [`setup/linux/install.sh`](setup/linux/install.sh) | Linux install |
 | [`setup/linux/configure.sh`](setup/linux/configure.sh) | Linux configure |
 | [`setup/macos/install.sh`](setup/macos/install.sh) | macOS install |

@@ -131,10 +131,19 @@ _CONFIG_PATH = Path.home() / ".claude" / "statusline_config.json"
 
 _DEFAULTS: dict = {
     "thresholds": {
-        "ctx":  {"warn": 70, "crit": 90},
-        "tkn":  {"warn": 70, "crit": 90},
-        "five": {"warn": 70, "crit": 90},
-        "week": {"warn": 50, "crit": 80},
+        "ctx":  {"warn": 60, "crit": 80},
+        "tkn":  {"warn": 60, "crit": 80},
+        "five": {"warn": 60, "crit": 80},
+        "week": {"warn": 60, "crit": 80},
+    },
+    "line1": {
+        "show_model":    True,
+        "show_effort":   True,
+        "show_thinking": True,
+        "show_ctx":      True,
+        "show_tkn":      True,
+        "show_five":     True,
+        "show_week":     True,
     },
     "line2": {
         "show_dir":      True,
@@ -164,8 +173,8 @@ def cfg_threshold(config: dict, key: str) -> tuple[int, int]:
     return warn, crit
 
 
-def cfg_line2(config: dict, key: str) -> bool:
-    return bool(config.get("line2", {}).get(key, _DEFAULTS["line2"][key]))
+def cfg_visibility(config: dict, section: str, key: str) -> bool:
+    return bool(config.get(section, {}).get(key, _DEFAULTS[section][key]))
 
 
 def main() -> None:
@@ -218,19 +227,32 @@ def main() -> None:
     five_c = color_threshold(five, five_warn, five_crit)
     week_c = color_threshold(week, week_warn, week_crit)
 
-    line1 = SEP.join([
-        f"{mc}{model}{RESET}",
-        effort_segment,
-        thinking_segment,
-        f"{ctx_c}ctx:{RESET}{ctx_c}{ctx}%{RESET}",
-        f"{tkn_c}tkn:{RESET}{tkn_c}{fmt_tokens(tkn)}{RESET}",
-        f"{five_c}5h:{RESET}{five_c}{five}%{RESET}",
-        f"{week_c}7d:{RESET}{week_c}{week}%{RESET}",
-    ])
+    v1 = lambda k: cfg_visibility(config, "line1", k)
+    line1_parts = []
+    if v1("show_model"):
+        line1_parts.append(f"{mc}{model}{RESET}")
+    if v1("show_effort"):
+        line1_parts.append(effort_segment)
+    if v1("show_thinking"):
+        line1_parts.append(thinking_segment)
+    if v1("show_ctx"):
+        line1_parts.append(f"{ctx_c}ctx:{RESET}{ctx_c}{ctx}%{RESET}")
+    if v1("show_tkn"):
+        line1_parts.append(f"{tkn_c}tkn:{RESET}{tkn_c}{fmt_tokens(tkn)}{RESET}")
+    if v1("show_five"):
+        line1_parts.append(f"{five_c}5h:{RESET}{five_c}{five}%{RESET}")
+    if v1("show_week"):
+        line1_parts.append(f"{week_c}7d:{RESET}{week_c}{week}%{RESET}")
+    line1 = SEP.join(line1_parts)
 
     # --- line 2 ----------------------------------------------------------
+    show_dir      = cfg_visibility(config, "line2", "show_dir")
+    show_branch   = cfg_visibility(config, "line2", "show_branch")
+    show_worktree = cfg_visibility(config, "line2", "show_worktree")
+    active        = sum([show_dir, show_branch, show_worktree])
+
     term_cols = shutil.get_terminal_size(fallback=(120, 24)).columns
-    n         = max(3, int(term_cols * 0.80) // 3)
+    n         = max(3, int(term_cols * 0.80) // max(1, active))
 
     def trunc(value: str) -> str:
         return f"…{value[-n:]}" if len(value) > n else value
@@ -239,11 +261,11 @@ def main() -> None:
         return f"{LABEL_COLOR}{name}: {RESET}{VALUE_COLOR}{trunc(value) or '-'}{RESET}"
 
     line2_parts = []
-    if cfg_line2(config, "show_dir"):
+    if show_dir:
         line2_parts.append(field("dir", cwd or "?"))
-    if cfg_line2(config, "show_branch"):
+    if show_branch:
         line2_parts.append(field("branch", branch))
-    if cfg_line2(config, "show_worktree"):
+    if show_worktree:
         line2_parts.append(field("worktree", worktree))
     line2 = SEP.join(line2_parts) if line2_parts else ""
 

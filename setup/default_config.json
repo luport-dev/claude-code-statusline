@@ -1,0 +1,22 @@
+{
+  "thresholds": {
+    "ctx":  {"warn": 60, "crit": 80},
+    "tkn":  {"warn": 60, "crit": 80},
+    "five": {"warn": 60, "crit": 80},
+    "week": {"warn": 60, "crit": 80}
+  },
+  "line1": {
+    "show_model":    true,
+    "show_effort":   true,
+    "show_thinking": true,
+    "show_ctx":      true,
+    "show_tkn":      true,
+    "show_five":     true,
+    "show_week":     true
+  },
+  "line2": {
+    "show_dir":      true,
+    "show_branch":   true,
+    "show_worktree": true
+  }
+}

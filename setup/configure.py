@@ -17,10 +17,19 @@ INSTALL_DEST = Path.home() / ".claude" / "statusline.py"
 
 DEFAULTS: dict = {
     "thresholds": {
-        "ctx":  {"warn": 70, "crit": 90},
-        "tkn":  {"warn": 70, "crit": 90},
-        "five": {"warn": 70, "crit": 90},
-        "week": {"warn": 50, "crit": 80},
+        "ctx":  {"warn": 60, "crit": 80},
+        "tkn":  {"warn": 60, "crit": 80},
+        "five": {"warn": 60, "crit": 80},
+        "week": {"warn": 60, "crit": 80},
+    },
+    "line1": {
+        "show_model":    True,
+        "show_effort":   True,
+        "show_thinking": True,
+        "show_ctx":      True,
+        "show_tkn":      True,
+        "show_five":     True,
+        "show_week":     True,
     },
     "line2": {
         "show_dir":      True,
@@ -59,7 +68,7 @@ def deep_merge(base: dict, override: dict) -> dict:
     return result
 
 
-MENU_ITEMS = ["Thresholds", "Line 2 visibility"]
+MENU_ITEMS = ["Thresholds", "Line 1 visibility", "Line 2 visibility"]
 
 
 def draw_box(win: "curses.window", title: str) -> None:
@@ -104,6 +113,16 @@ def main_menu(stdscr: "curses.window", config: dict) -> tuple[dict, bool]:
             if selected == 0:
                 config = menu_thresholds(stdscr, config)
             elif selected == 1:
+                config = menu_visibility(stdscr, config, "line1", "Line 1 Visibility", [
+                    ("show_model",    "model"),
+                    ("show_effort",   "effort"),
+                    ("show_thinking", "thinking"),
+                    ("show_ctx",      "ctx"),
+                    ("show_tkn",      "tkn"),
+                    ("show_five",     "5h"),
+                    ("show_week",     "7d"),
+                ])
+            elif selected == 2:
                 config = menu_visibility(stdscr, config)
 
 
@@ -188,26 +207,32 @@ def menu_thresholds(stdscr: "curses.window", config: dict) -> dict:
     return config
 
 
-def menu_visibility(stdscr: "curses.window", config: dict) -> dict:
+def menu_visibility(
+    stdscr: "curses.window",
+    config: dict,
+    section: str = "line2",
+    title: str = "Line 2 Visibility",
+    items: list | None = None,
+) -> dict:
+    if items is None:
+        items = [
+            ("show_dir",      "dir"),
+            ("show_branch",   "branch"),
+            ("show_worktree", "worktree"),
+        ]
     curses.curs_set(0)
     stdscr.keypad(True)
 
-    items = [
-        ("show_dir",      "dir"),
-        ("show_branch",   "branch"),
-        ("show_worktree", "worktree"),
-    ]
-
-    line2 = config.get("line2", {})
+    sec = config.get(section, {})
     state: dict[str, bool] = {
-        k: bool(line2.get(k, DEFAULTS["line2"][k])) for k, _ in items
+        k: bool(sec.get(k, DEFAULTS[section][k])) for k, _ in items
     }
     selected = 0
 
     while True:
         stdscr.clear()
         h, w = stdscr.getmaxyx()
-        draw_box(stdscr, "Line 2 Visibility")
+        draw_box(stdscr, title)
 
         for i, (key, lbl) in enumerate(items):
             check = "x" if state[key] else " "
@@ -230,7 +255,7 @@ def menu_visibility(stdscr: "curses.window", config: dict) -> dict:
             state[k] = not state[k]
 
     config = dict(config)
-    config["line2"] = {k: state[k] for k, _ in items}
+    config[section] = {k: state[k] for k, _ in items}
     return config
 
 
