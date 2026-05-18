@@ -82,7 +82,7 @@ def effort_color(level: str) -> str:
 
 
 def label(text: str, color: str) -> str:
-    return f"{color}{text}:{RESET}"
+    return f"{color}{text}: {RESET}"
 
 
 def git_branch(cwd: str) -> str:
@@ -176,7 +176,7 @@ def main() -> None:
         return f"…{value[-n:]}" if len(value) > n else value
 
     def field(name: str, value: str) -> str:
-        return f"{LABEL_COLOR}{name}:{RESET}{VALUE_COLOR}{trunc(value) or '-'}{RESET}"
+        return f"{LABEL_COLOR}{name}: {RESET}{VALUE_COLOR}{trunc(value) or '-'}{RESET}"
 
     line2 = SEP.join([
         field("dir",      cwd or "?"),
