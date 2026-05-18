@@ -24,7 +24,7 @@ ESC = "\x1b"
 RESET = f"{ESC}[0m"
 DIM = f"{ESC}[2m"
 DIM_GRAY = f"{ESC}[2;37m"
-SEP = f" {DIM}|{RESET} "
+SEP = " │ "
 
 LABEL_COLOR = f"{ESC}[38;5;130m"   # rust brown for dir/branch/worktree labels
 VALUE_COLOR = f"{ESC}[38;5;172m"   # warm bronze for the values
