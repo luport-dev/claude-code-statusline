@@ -127,6 +127,47 @@ def read_thinking_setting() -> bool:
         return False
 
 
+_CONFIG_PATH = Path.home() / ".claude" / "statusline_config.json"
+
+_DEFAULTS: dict = {
+    "thresholds": {
+        "ctx":  {"warn": 70, "crit": 90},
+        "tkn":  {"warn": 70, "crit": 90},
+        "five": {"warn": 70, "crit": 90},
+        "week": {"warn": 50, "crit": 80},
+    },
+    "line2": {
+        "show_dir":      True,
+        "show_branch":   True,
+        "show_worktree": True,
+    },
+}
+
+
+def load_config() -> dict:
+    try:
+        if _CONFIG_PATH.exists():
+            with _CONFIG_PATH.open(encoding="utf-8") as f:
+                data = json.load(f)
+            if isinstance(data, dict):
+                return data
+    except Exception:
+        pass
+    return {}
+
+
+def cfg_threshold(config: dict, key: str) -> tuple[int, int]:
+    t = config.get("thresholds", {}).get(key, {})
+    d = _DEFAULTS["thresholds"][key]
+    warn = int(t.get("warn", d["warn"]))
+    crit = int(t.get("crit", d["crit"]))
+    return warn, crit
+
+
+def cfg_line2(config: dict, key: str) -> bool:
+    return bool(config.get("line2", {}).get(key, _DEFAULTS["line2"][key]))
+
+
 def main() -> None:
     try:
         raw = sys.stdin.read()
@@ -143,6 +184,7 @@ def main() -> None:
     effort   = dig(data, "effort.level", "low") or "low"
     ctx      = to_int(dig(data, "context_window.used_percentage"))
     tkn      = to_int(dig(data, "context_window.total_input_tokens"))
+    tkn_pct  = to_int(dig(data, "context_window.used_percentage"))
     five     = to_int(dig(data, "rate_limits.five_hour.used_percentage"))
     week     = to_int(dig(data, "rate_limits.seven_day.used_percentage"))
 
@@ -164,16 +206,24 @@ def main() -> None:
     else:
         thinking_segment = f"{DIM_GRAY}thinking:off{RESET}"
 
-    ctx_c  = color_threshold(ctx,  70, 90)
-    five_c = color_threshold(five, 70, 90)
-    week_c = color_threshold(week, 50, 80)
+    config = load_config()
+
+    ctx_warn,  ctx_crit  = cfg_threshold(config, "ctx")
+    tkn_warn,  tkn_crit  = cfg_threshold(config, "tkn")
+    five_warn, five_crit = cfg_threshold(config, "five")
+    week_warn, week_crit = cfg_threshold(config, "week")
+
+    ctx_c  = color_threshold(ctx,  ctx_warn,  ctx_crit)
+    tkn_c  = color_threshold(tkn_pct, tkn_warn, tkn_crit)
+    five_c = color_threshold(five, five_warn, five_crit)
+    week_c = color_threshold(week, week_warn, week_crit)
 
     line1 = SEP.join([
         f"{mc}{model}{RESET}",
         effort_segment,
         thinking_segment,
         f"{ctx_c}ctx:{RESET}{ctx_c}{ctx}%{RESET}",
-        f"{ctx_c}tkn:{RESET}{ctx_c}{fmt_tokens(tkn)}{RESET}",
+        f"{tkn_c}tkn:{RESET}{tkn_c}{fmt_tokens(tkn)}{RESET}",
         f"{five_c}5h:{RESET}{five_c}{five}%{RESET}",
         f"{week_c}7d:{RESET}{week_c}{week}%{RESET}",
     ])
@@ -188,14 +238,18 @@ def main() -> None:
     def field(name: str, value: str) -> str:
         return f"{LABEL_COLOR}{name}: {RESET}{VALUE_COLOR}{trunc(value) or '-'}{RESET}"
 
-    line2 = SEP.join([
-        field("dir",      cwd or "?"),
-        field("branch",   branch),
-        field("worktree", worktree),
-    ])
+    line2_parts = []
+    if cfg_line2(config, "show_dir"):
+        line2_parts.append(field("dir", cwd or "?"))
+    if cfg_line2(config, "show_branch"):
+        line2_parts.append(field("branch", branch))
+    if cfg_line2(config, "show_worktree"):
+        line2_parts.append(field("worktree", worktree))
+    line2 = SEP.join(line2_parts) if line2_parts else ""
 
     print(line1)
-    print(line2)
+    if line2:
+        print(line2)
 
 
 if __name__ == "__main__":

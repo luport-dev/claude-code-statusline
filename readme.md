@@ -10,7 +10,8 @@
 A two-line, colored status line for the **[Claude Code CLI](https://claude.ai/code)** that shows all relevant session data at a glance: 
 - the current model (color-coded by type)
 - the effort level
-- context usage
+- thinking mode status
+- context usage and token count
 - rate limits for both the 5-hour and 7-day windows
 - the working directory
 - the active git branch
@@ -20,7 +21,7 @@ Colors automatically shift from green to yellow to red as defined thresholds are
 
 ## How it Works
 
-Claude Code passes a JSON object to the status line via stdin. The script reads it, determines the git branch via `git branch --show-current` in the current working directory, and returns the formatted, colored output — Linux/macOS via Bash + `jq`, Windows via Python 3 (standard library only, no extra packages required).
+Claude Code passes a JSON object to the status line via stdin. The script reads it, determines the git branch via `git branch --show-current` in the current working directory, and returns the formatted, colored output — implemented in Python 3 (standard library only) and works on Linux, macOS, and Windows.
 
 
 ## Examples
@@ -33,8 +34,8 @@ Claude Code passes a JSON object to the status line via stdin. The script reads 
 
 > *Example values for illustrating the color stages.*
 
-**Line 1** — Model (colored by type), effort, thinking status, context usage, rate limits (5h / 7d)<br>
-**Line 2** — Working directory, git branch, active worktree (in bronze tones)
+**Line 1** — Model (colored by type), effort, thinking status, context usage (`ctx`), token count (`tkn`), rate limits (5h / 7d)<br>
+**Line 2** — Working directory, git branch, active worktree (in bronze tones, truncated to fit terminal width)
 
 Colors automatically shift green → yellow → red depending on usage.
 
@@ -48,85 +49,105 @@ Colors automatically shift green → yellow → red depending on usage.
 | Haiku | ⚪ White |
 | thinking:on | 🟢 Teal |
 | thinking:off | ⚫ Dimmed gray |
-| effort / ctx / 5h / 7d (low) | 🟢 Green |
-| effort / ctx / 5h / 7d (medium) | 🟡 Yellow |
-| effort / ctx / 5h / 7d (high) | 🔴 Red |
+| effort / ctx / tkn / 5h / 7d (low) | 🟢 Green |
+| effort / ctx / tkn / 5h / 7d (medium) | 🟡 Yellow |
+| effort / ctx / tkn / 5h / 7d (high) | 🔴 Red |
 | dir / branch / worktree labels | 🟤 Rust brown |
 | dir / branch / worktree values | 🟠 Warm bronze |
 
 
 ## Thresholds
 
+Default thresholds (configurable via `configure`):
+
 | Metric | Yellow at | Red at |
 |--------|-----------|--------|
 | ctx | 70% | 90% |
+| tkn | 70% | 90% |
 | 5h rate limit | 70% | 90% |
 | 7d rate limit | 50% | 80% |
 
 
-## Customizing
+## Configuration
 
-The scripts can be freely edited:
+Run the interactive configuration tool to customize thresholds and line 2 visibility:
 
-- **Change colors**: Adjust `model_color`, `effort_color`, and `color` (or `Model-Color`, `Effort-Color`, `Color-Threshold` in PowerShell). Truecolor (`38;2;R;G;B`) or [256-color ANSI codes](https://www.ditig.com/256-colors-cheat-sheet) can be used for more variety.
-- **Remove fields**: Delete individual entries from the array or line composition.
-- **Thresholds**: Adjust the values in the `color` calls (`warn`, `crit`).
-- **Single-line**: Remove the second block (line 2).
+```bash
+# Linux
+./setup/linux/configure.sh
+
+# macOS
+./setup/macos/configure.sh
+```
+
+```cmd
+# Windows (CMD)
+setup\win\configure.cmd
+```
+
+The TUI lets you adjust warning/critical thresholds for each metric and toggle which fields appear on line 2 (dir, branch, worktree). Settings are saved to `~/.claude/statusline_config.json`.
+
+> On Windows, `windows-curses` is installed automatically by `install.cmd`.
 
 
 ## Files
 
-| File | Platform |
-|------|----------|
-| [`scripts/linux/statusline.sh`](scripts/linux/statusline.sh) | Linux / macOS (Bash + `jq`) |
-| [`scripts/win/statusline.py`](scripts/win/statusline.py) | Windows (Python 3, standard library only) |
+| File | Description |
+|------|-------------|
+| [`scripts/statusline.py`](scripts/statusline.py) | Status line script (all platforms) |
+| [`setup/_settings.py`](setup/_settings.py) | Shared settings helper |
+| [`setup/configure.py`](setup/configure.py) | Interactive configuration TUI |
+| [`setup/linux/install.sh`](setup/linux/install.sh) | Linux install |
+| [`setup/linux/configure.sh`](setup/linux/configure.sh) | Linux configure |
+| [`setup/macos/install.sh`](setup/macos/install.sh) | macOS install |
+| [`setup/macos/configure.sh`](setup/macos/configure.sh) | macOS configure |
+| [`setup/win/install.cmd`](setup/win/install.cmd) | Windows install |
+| [`setup/win/configure.cmd`](setup/win/configure.cmd) | Windows configure |
 
 
 # Requirements
 
 | Platform | Requirements |
 |----------|--------------|
-| Linux | `git`, `jq` |
-| macOS | `git`, `jq` |
-| Windows | `git`, Python 3.8+ (no pip packages required) |
+| Linux | `git`, Python 3.8+ |
+| macOS | `git`, Python 3.8+ |
+| Windows | `git`, Python 3.8+ (installed automatically by `install.cmd` if missing) |
 
 <details>
-<summary><strong>Linux</strong> — Installing Git and <code>jq</code></summary>
+<summary><strong>Linux</strong> — Installing Git and Python</summary>
 
 Depending on the distribution:
 
 ```bash
-sudo apt install git jq        # Debian / Ubuntu / Mint
-sudo dnf install git jq        # Fedora / RHEL / CentOS
-sudo pacman -S git jq          # Arch / Manjaro
-sudo zypper install git jq     # openSUSE
+sudo apt install git python3        # Debian / Ubuntu / Mint
+sudo dnf install git python3        # Fedora / RHEL / CentOS
+sudo pacman -S git python            # Arch / Manjaro
+sudo zypper install git python3     # openSUSE
 ```
 
-Verify: `git --version` and `jq --version` should both output a version number.
+Verify: `git --version` and `python3 --version` should both output a version number.
 
 </details>
 
 <details>
-<summary><strong>macOS</strong> — Installing Git and <code>jq</code></summary>
+<summary><strong>macOS</strong> — Installing Git and Python</summary>
 
 Via [Homebrew](https://brew.sh):
 
 ```bash
-brew install git jq
+brew install git python
 ```
 
-Alternatively, running `git --version` will prompt to install Git via the Xcode Command Line Tools. `jq` must be installed separately (Homebrew).
+Alternatively, running `git --version` will prompt to install Git via the Xcode Command Line Tools. Python can also be installed from [python.org](https://www.python.org/downloads/mac-osx/).
 
-Verify: `git --version` and `jq --version` should both output a version number.
+Verify: `git --version` and `python3 --version` should both output a version number.
 
 </details>
 
 <details>
 <summary><strong>Windows</strong> — Installing Git and Python</summary>
 
-> `jq` is not required on Windows — the Python variant uses only the standard library.
-
-Install Git from [git-scm.com](https://git-scm.com/download/win) and Python 3 from [python.org](https://www.python.org/downloads/windows/). Alternatively via [winget](https://learn.microsoft.com/en-us/windows/package-manager/winget/):
+Install Git from [git-scm.com](https://git-scm.com/download/win). Python 3 is installed automatically by `install.cmd` via winget if not already present. Alternatively, install manually:
 
 ```powershell
 winget install --id Git.Git -e
@@ -154,56 +175,77 @@ cd Claude-Code-CLI-StatusLine
 <details>
 <summary><strong>Linux</strong></summary>
 
-Requires `git` and `jq`.
+Requires `git` and Python 3.
 
-**Setup script:**
+**Setup scripts:**
 
 ```bash
 ./setup/linux/install.sh      # install
 ./setup/linux/uninstall.sh    # uninstall
+./setup/linux/configure.sh    # configure thresholds & visibility
 ```
 
 **Manual installation:**
 
-Copy [`scripts/linux/statusline.sh`](scripts/linux/statusline.sh) to `~/.claude/statusline.sh` and make it executable (`chmod +x`). Then reference it in `~/.claude/settings.json` under `statusLine` as a command pointing to the absolute path (type `command`).
+Copy [`scripts/statusline.py`](scripts/statusline.py) to `~/.claude/statusline.py`. Then reference it in `~/.claude/settings.json` under `statusLine`:
+
+```json
+{
+  "statusLine": {
+    "type": "command",
+    "command": "python3 /home/YOUR_USERNAME/.claude/statusline.py"
+  }
+}
+```
 
 </details>
 
 <details>
 <summary><strong>macOS</strong></summary>
 
-Requires `git` and `jq` (install via Homebrew: `brew install jq`).
+Requires `git` and Python 3.
 
-**Setup script:**
+**Setup scripts:**
 
 ```bash
 ./setup/macos/install.sh      # install
 ./setup/macos/uninstall.sh    # uninstall
+./setup/macos/configure.sh    # configure thresholds & visibility
 ```
 
 **Manual installation:**
 
-Copy [`scripts/linux/statusline.sh`](scripts/linux/statusline.sh) to `~/.claude/statusline.sh` and make it executable (`chmod +x`). Reference it in `~/.claude/settings.json` under `statusLine` as a command pointing to the absolute path (`/Users/YOUR_USERNAME/.claude/statusline.sh`, type `command`).
+Copy [`scripts/statusline.py`](scripts/statusline.py) to `~/.claude/statusline.py`. Reference it in `~/.claude/settings.json` under `statusLine`:
+
+```json
+{
+  "statusLine": {
+    "type": "command",
+    "command": "python3 /Users/YOUR_USERNAME/.claude/statusline.py"
+  }
+}
+```
 
 </details>
 
 <details>
 <summary><strong>Windows</strong></summary>
 
-Requires `git` and Python 3 in `PATH`.
+Requires `git`. Python 3 is installed automatically if missing.
 
-**Setup script** — in a regular terminal (CMD):
+**Setup scripts** — in a regular terminal (CMD):
 
 ```cmd
-setup\win\install.cmd
-setup\win\uninstall.cmd
+setup\win\install.cmd      rem install
+setup\win\uninstall.cmd    rem uninstall
+setup\win\configure.cmd    rem configure thresholds & visibility
 ```
 
-The install script copies `statusline.py` to `%USERPROFILE%\.claude\statusline.py` and merges the `statusLine` entry into `settings.json` (existing files are backed up as `.bak.<timestamp>`).
+The install script copies `statusline.py` to `%USERPROFILE%\.claude\statusline.py` and merges the `statusLine` entry into `settings.json` (existing files are backed up as `.bak.<timestamp>`). It also installs `windows-curses` so the configuration TUI works.
 
 **Manual installation:**
 
-Copy [`scripts/win/statusline.py`](scripts/win/statusline.py) to `%USERPROFILE%\.claude\statusline.py`. In `~/.claude/settings.json`, reference it under `statusLine`:
+Copy [`scripts/statusline.py`](scripts/statusline.py) to `%USERPROFILE%\.claude\statusline.py`. In `~/.claude/settings.json`, reference it under `statusLine`:
 
 ```json
 {
