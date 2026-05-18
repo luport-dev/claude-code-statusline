@@ -169,7 +169,7 @@ def main() -> None:
 
     # --- line 2 ----------------------------------------------------------
     def trunc(value: str, n: int = 25) -> str:
-        return value[-n:] if len(value) > n else value
+        return f"...{value[-n:]}" if len(value) > n else value
 
     def field(name: str, value: str) -> str:
         return f"{LABEL_COLOR}{name}:{RESET}{VALUE_COLOR}{trunc(value) or '-'}{RESET}"
