@@ -1,13 +1,9 @@
-
 # Claude Code CLI Status Line
-
-> ⚠️ **Beta**  
-  This project is currently in beta. There is **no guarantee** that the scripts work correctly on every system or configuration.  
-  *Use at your own risk and feel free to report issues!*
 
 ## What is it?
 
 A two-line, colored status line for the **[Claude Code CLI](https://claude.ai/code)** that shows all relevant session data at a glance:
+
 - the current model (color-coded by type)
 - the effort level
 - thinking mode status
@@ -114,6 +110,57 @@ Default thresholds (configurable in the TUI):
 | 7d rate limit | 60% | 80% |
 
 
+# Requirements
+
+| Platform | Requirements |
+|----------|--------------|
+| Linux | `git`, Python 3.8+ |
+| macOS | `git`, Python 3.8+ |
+| Windows | `git`, Python 3.8+, plus `windows-curses` for the TUI |
+
+None of the scripts install Python automatically — if it's missing they print a warning with a hint. Install Python yourself:
+
+<details>
+<summary><strong>Linux</strong></summary>
+
+```bash
+sudo apt install git python3        # Debian / Ubuntu / Mint
+sudo dnf install git python3        # Fedora / RHEL / CentOS
+sudo pacman -S git python            # Arch / Manjaro
+sudo zypper install git python3     # openSUSE
+```
+
+</details>
+
+<details>
+<summary><strong>macOS</strong></summary>
+
+Via [Homebrew](https://brew.sh):
+
+```bash
+brew install git python
+```
+
+Alternatively, running `git --version` will prompt to install Git via the Xcode Command Line Tools. Python can also be installed from [python.org](https://www.python.org/downloads/mac-osx/).
+
+</details>
+
+<details>
+<summary><strong>Windows</strong></summary>
+
+Install Git from [git-scm.com](https://git-scm.com/download/win) and Python from [python.org](https://www.python.org/) (or via winget):
+
+```powershell
+winget install --id Git.Git -e
+winget install --id Python.Python.3.12 -e
+pip install windows-curses
+```
+
+> When installing Python, make sure **"Add python.exe to PATH"** is checked.
+
+</details>
+</br>
+
 # Installation
 
 Everything — install, configure, uninstall — runs through a single interactive TUI. There is no separate install script: the TUI's main menu has a toggle entry that becomes **Install** when the status line is not registered in `~/.claude/settings.json` and **Uninstall** when it is. Selecting it copies (or removes) `statusline.py` in `~/.claude/` and updates `settings.json` accordingly. Existing files are backed up as `.bak.<timestamp>`.
@@ -178,57 +225,6 @@ On Windows use forward slashes and `python` instead of `python3`:
 > *Restart Claude Code — the status line is loaded on **next startup**.*
 
 
-# Requirements
-
-| Platform | Requirements |
-|----------|--------------|
-| Linux | `git`, Python 3.8+ |
-| macOS | `git`, Python 3.8+ |
-| Windows | `git`, Python 3.8+, plus `windows-curses` for the TUI |
-
-None of the scripts install Python automatically — if it's missing they print a warning with a hint. Install Python yourself:
-
-<details>
-<summary><strong>Linux</strong></summary>
-
-```bash
-sudo apt install git python3        # Debian / Ubuntu / Mint
-sudo dnf install git python3        # Fedora / RHEL / CentOS
-sudo pacman -S git python            # Arch / Manjaro
-sudo zypper install git python3     # openSUSE
-```
-
-</details>
-
-<details>
-<summary><strong>macOS</strong></summary>
-
-Via [Homebrew](https://brew.sh):
-
-```bash
-brew install git python
-```
-
-Alternatively, running `git --version` will prompt to install Git via the Xcode Command Line Tools. Python can also be installed from [python.org](https://www.python.org/downloads/mac-osx/).
-
-</details>
-
-<details>
-<summary><strong>Windows</strong></summary>
-
-Install Git from [git-scm.com](https://git-scm.com/download/win) and Python from [python.org](https://www.python.org/) (or via winget):
-
-```powershell
-winget install --id Git.Git -e
-winget install --id Python.Python.3.12 -e
-pip install windows-curses
-```
-
-> When installing Python, make sure **"Add python.exe to PATH"** is checked.
-
-</details>
-
-
 # Configuration TUI
 
 The same TUI handles install/uninstall and all configuration. Settings are saved to `~/.claude/statusline_config.json`.
@@ -242,7 +238,7 @@ The same TUI handles install/uninstall and all configuration. Settings are saved
 │    [/] Git visibility                                                       │
 │    [#] Decoration (emoji/label)                                             │
 │    [=] Bar style                                                            │
-│    [~] Update checks                                                        │
+│    [@] Update checks                                                        │
 │    [ ] Install      ← toggles to "[x] Uninstall" once registered            │
 │                                                                             │
 │             config: ~/.claude/statusline_config.json                        │
