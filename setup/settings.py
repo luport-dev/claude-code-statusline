@@ -207,7 +207,7 @@ MENU_ITEMS = [
     ("Git visibility",           "🌳"),
     ("Decoration (symbols/label)", "🎨"),
     ("Bar style",                "📊"),
-    ("Update checks",            "🔄"),
+    ("Update checks",            "♻️"),
 ]
 
 
