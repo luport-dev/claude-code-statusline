@@ -34,5 +34,5 @@ else
 fi
 
 # --- settings.json bereinigen -------------------------------------------
-"$PY" "$SCRIPT_DIR/../_settings.py" uninstall
+"$PY" "$SCRIPT_DIR/../_install_helper.py" uninstall
 echo ">> Done. Restart Claude Code."

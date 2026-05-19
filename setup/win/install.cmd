@@ -65,7 +65,7 @@ copy /Y "%SRC%" "%DEST%" >nul || (
 echo    installed: %DEST%
 
 rem --- Merge statusLine entry into settings.json ---------------------
-%PY% "%SCRIPT_DIR%..\_settings.py" install
+%PY% "%SCRIPT_DIR%..\_install_helper.py" install
 if errorlevel 1 (
     echo ERROR: Failed to update settings.json
     exit /b 1

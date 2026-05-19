@@ -46,7 +46,7 @@ chmod +x "$DEST"
 echo "   installed: $DEST"
 
 # --- settings.json aktualisieren ----------------------------------------
-"$PY" "$SCRIPT_DIR/../_settings.py" install
+"$PY" "$SCRIPT_DIR/../_install_helper.py" install
 # --- Default-Config anlegen (nur bei Erstinstallation) -----------------
 CONFIG_DEST="$HOME/.claude/statusline_config.json"
 CONFIG_SRC="$REPO_ROOT/setup/default_config.json"

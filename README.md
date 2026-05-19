@@ -234,7 +234,7 @@ Choose **Save changes** or **Discard changes** — shortcuts `s` / `d` work too.
 | File | Description |
 |------|-------------|
 | [`scripts/statusline.py`](scripts/statusline.py) | Status line script (all platforms) |
-| [`setup/_settings.py`](setup/_settings.py) | Shared settings helper |
+| [`setup/_install_helper.py`](setup/_install_helper.py) | Install helper — merges/removes the statusLine entry in `~/.claude/settings.json` |
 | [`setup/settings.py`](setup/settings.py) | Interactive configuration TUI |
 | [`setup/default_config.json`](setup/default_config.json) | Default configuration (copied on first install) |
 | [`setup/linux/install.sh`](setup/linux/install.sh) | Linux install |

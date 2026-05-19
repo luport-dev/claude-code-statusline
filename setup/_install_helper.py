@@ -5,10 +5,10 @@ Used by install.cmd / install.sh and uninstall.cmd / uninstall.sh.
 A timestamped backup is always written when an existing file is modified.
 
 Usage:
-    python  _settings.py install
-    python  _settings.py uninstall
-    python3 _settings.py install
-    python3 _settings.py uninstall
+    python  _install_helper.py install
+    python  _install_helper.py uninstall
+    python3 _install_helper.py install
+    python3 _install_helper.py uninstall
 """
 from __future__ import annotations
 
@@ -73,7 +73,7 @@ def cmd_uninstall() -> None:
 
 def main() -> int:
     if len(sys.argv) != 2 or sys.argv[1] not in ("install", "uninstall"):
-        print("usage: python _settings.py {install|uninstall}", file=sys.stderr)
+        print("usage: python _install_helper.py {install|uninstall}", file=sys.stderr)
         return 2
     if sys.argv[1] == "install":
         cmd_install()
