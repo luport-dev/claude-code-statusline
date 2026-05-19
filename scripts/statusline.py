@@ -52,6 +52,21 @@ def to_int(value, default: int = 0) -> int:
         return default
 
 
+def to_float(value, default: float = 0.0) -> float:
+    """Parse to float; tolerate strings, None, and garbage."""
+    if value is None:
+        return default
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return default
+
+
+def fmt_pct(value: float) -> str:
+    """Format percentage with one decimal place."""
+    return f"{value:.1f}%"
+
+
 def fmt_tokens(n: int) -> str:
     if n >= 1_000_000:
         return f"{n/1_000_000:.1f}M"
@@ -336,11 +351,15 @@ def main() -> None:
     worktree = dig(data, "worktree.name", "") or ""
     model    = dig(data, "model.display_name", "") or ""
     effort   = dig(data, "effort.level", "low") or "low"
-    ctx      = to_int(dig(data, "context_window.used_percentage"))
+    ctx_f    = to_float(dig(data, "context_window.used_percentage"))
+    ctx      = int(ctx_f)
     tkn      = to_int(dig(data, "context_window.total_input_tokens"))
-    tkn_pct  = to_int(dig(data, "context_window.used_percentage"))
-    five     = to_int(dig(data, "rate_limits.five_hour.used_percentage"))
-    week     = to_int(dig(data, "rate_limits.seven_day.used_percentage"))
+    tkn_pct_f = ctx_f
+    tkn_pct  = ctx
+    five_f   = to_float(dig(data, "rate_limits.five_hour.used_percentage"))
+    five     = int(five_f)
+    week_f   = to_float(dig(data, "rate_limits.seven_day.used_percentage"))
+    week     = int(week_f)
 
     branch = git_branch(cwd)
     thinking_on = read_thinking_setting()
@@ -445,10 +464,10 @@ def main() -> None:
         return f"{text_prefix(metric, color)}{bar} {text}"
 
     for seg in (
-        metric_segment("ctx",  ctx,     ctx_c,  f"{ctx}%"),
+        metric_segment("ctx",  ctx,     ctx_c,  fmt_pct(ctx_f)),
         metric_segment("tkn",  tkn_pct, tkn_c,  fmt_tokens(tkn)),
-        metric_segment("five", five,    five_c, f"{five}%"),
-        metric_segment("week", week,    week_c, f"{week}%"),
+        metric_segment("five", five,    five_c, fmt_pct(five_f)),
+        metric_segment("week", week,    week_c, fmt_pct(week_f)),
     ):
         if seg is not None:
             line1_parts.append(seg)
