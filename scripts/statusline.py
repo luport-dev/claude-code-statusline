@@ -100,6 +100,16 @@ _BAR_GLYPHS = {
 }
 
 
+def bar_last_color(pct: int, segments: int = 10) -> str:
+    """Return the ANSI color of the last filled segment for a given percentage."""
+    pct = max(0, min(100, pct))
+    filled = pct * segments // 100
+    if filled == 0:
+        return f"{ESC}[32m"  # grün bei 0%
+    idx = min(filled - 1, len(_GRAD_R) - 1)
+    return f"{ESC}[38;2;{_GRAD_R[idx]};{_GRAD_G[idx]};{_GRAD_B[idx]}m"
+
+
 def render_bar(pct: int, glyphs: tuple[str, str] = ("▰", "▱"), segments: int = 10) -> str:
     """Render a coloured progress bar for a 0-100 percentage."""
     on, off = glyphs
@@ -338,6 +348,26 @@ def cfg_display(config: dict, metric: str) -> str:
     return _DEFAULTS["metrics"][metric]["display"]
 
 
+def load_state() -> dict:
+    try:
+        if _STATE_PATH.exists():
+            with _STATE_PATH.open(encoding="utf-8") as f:
+                d = json.load(f)
+            return d if isinstance(d, dict) else {}
+    except Exception:
+        pass
+    return {}
+
+
+def save_state(data: dict) -> None:
+    try:
+        _STATE_PATH.parent.mkdir(parents=True, exist_ok=True)
+        with _STATE_PATH.open("w", encoding="utf-8") as f:
+            json.dump(data, f)
+    except OSError:
+        pass
+
+
 def main() -> None:
     try:
         raw = sys.stdin.read()
@@ -347,6 +377,11 @@ def main() -> None:
     except Exception:
         print("?")
         return
+
+    state = load_state()
+    # Fehlende Werte aus dem letzten bekannten State ergänzen
+    if not data:
+        data = state.get("last_data", {})
 
     cwd      = dig(data, "cwd", "") or ""
     worktree = dig(data, "worktree.name", "") or ""
@@ -366,12 +401,7 @@ def main() -> None:
     thinking_on = read_thinking_setting()
 
     if model:
-        try:
-            _STATE_PATH.parent.mkdir(parents=True, exist_ok=True)
-            with _STATE_PATH.open("w", encoding="utf-8") as f:
-                json.dump({"last_model": model}, f)
-        except OSError:
-            pass
+        save_state({"last_data": data})
 
     is_haiku = "haiku" in model.lower()
 
@@ -457,12 +487,12 @@ def main() -> None:
         if mode == "off":
             return None
         bar = render_bar(pct, glyphs)
-        text = f"{color}{text_value}{RESET}"
+        last_color = bar_last_color(pct)
         if mode == "bar":
-            return f"{prefix(config, metric, color)}{bar}"
+            return f"{prefix(config, metric, last_color)}{bar}"
         if mode == "text":
-            return f"{text_prefix(metric, color)}{text}"
-        return f"{text_prefix(metric, color)}{bar} {text}"
+            return f"{text_prefix(metric, color)}{color}{text_value}{RESET}"
+        return f"{text_prefix(metric, last_color)}{bar} {last_color}{text_value}{RESET}"
 
     for seg in (
         metric_segment("ctx",  ctx,     ctx_c,  fmt_pct(ctx_f)),
