@@ -68,6 +68,28 @@ def color_threshold(value: float, warn: float, crit: float) -> str:
     return f"{ESC}[32m"      # green
 
 
+# 10-segment gradient (green -> yellow -> red), inspired by kcchien/claude-code-statusline
+_GRAD_R = (46, 116, 186, 241, 239, 236, 233, 231, 211, 192)
+_GRAD_G = (204, 195, 186, 196, 161, 126, 101,  76,  66,  57)
+_GRAD_B = (113,  89,  64,  15,  24,  34,  44,  60,  50,  43)
+_BAR_EMPTY_COLOR = f"{ESC}[38;2;80;80;80m"
+
+
+def render_bar(pct: int, segments: int = 10) -> str:
+    """Render a coloured progress bar for a 0-100 percentage."""
+    pct = max(0, min(100, pct))
+    filled = pct * segments // 100
+    out = []
+    for i in range(segments):
+        if i < filled:
+            idx = min(i, len(_GRAD_R) - 1)
+            out.append(f"{ESC}[38;2;{_GRAD_R[idx]};{_GRAD_G[idx]};{_GRAD_B[idx]}m▰")
+        else:
+            out.append(f"{_BAR_EMPTY_COLOR}▱")
+    out.append(RESET)
+    return "".join(out)
+
+
 def model_color(name: str) -> str:
     n = (name or "").lower()
     if "opus" in n:
@@ -79,6 +101,9 @@ def model_color(name: str) -> str:
     return f"{ESC}[37m"
 
 
+_EFFORT_LEVELS = ("low", "medium", "high", "xhigh")
+
+
 def effort_color(level: str) -> str:
     if level == "xhigh":
         return f"{ESC}[31m"
@@ -87,6 +112,48 @@ def effort_color(level: str) -> str:
     if level == "medium":
         return f"{ESC}[33m"
     return f"{ESC}[32m"
+
+
+_MODEL_ORDER = ("haiku", "sonnet", "opus")
+
+
+def render_model_bar(name: str) -> str:
+    """3-segment bar (haiku, sonnet, opus). Only the active model's segment is coloured."""
+    n = (name or "").lower()
+    active = next((m for m in _MODEL_ORDER if m in n), None)
+    out = []
+    for m in _MODEL_ORDER:
+        if m == active:
+            out.append(f"{model_color(m)}▰")
+        else:
+            out.append(f"{_BAR_EMPTY_COLOR}▱")
+    out.append(RESET)
+    return "".join(out)
+
+
+def render_thinking_bar(on: bool) -> str:
+    """2-segment bar: left=off (red), right=on (green). Only one is coloured."""
+    red   = f"{ESC}[31m"
+    green = f"{ESC}[32m"
+    if on:
+        return f"{_BAR_EMPTY_COLOR}▱{green}▰{RESET}"
+    return f"{red}▰{_BAR_EMPTY_COLOR}▱{RESET}"
+
+
+def render_effort_bar(level: str) -> str:
+    """4-segment bar (low → xhigh), filled up to the current level."""
+    try:
+        filled = _EFFORT_LEVELS.index(level) + 1
+    except ValueError:
+        filled = 0
+    out = []
+    for i, lvl in enumerate(_EFFORT_LEVELS):
+        if i < filled:
+            out.append(f"{effort_color(lvl)}▰")
+        else:
+            out.append(f"{_BAR_EMPTY_COLOR}▱")
+    out.append(RESET)
+    return "".join(out)
 
 
 def label(text: str, color: str) -> str:
@@ -128,6 +195,29 @@ def read_thinking_setting() -> bool:
 
 
 _CONFIG_PATH = Path.home() / ".claude" / "statusline_config.json"
+_STATE_PATH  = Path.home() / ".claude" / "statusline_state.json"
+
+_DISPLAY_CHOICES = ("bar", "text", "both", "off")
+
+_BAR_EMOJI = {
+    "model":    "🤖",
+    "effort":   "💪",
+    "thinking": "💡",
+    "ctx":      "📦",
+    "tkn":      "🪙",
+    "five":     "🕔",
+    "week":     "📅",
+}
+
+_BAR_LABEL = {
+    "model":    "model",
+    "effort":   "effort",
+    "thinking": "thinking",
+    "ctx":      "ctx",
+    "tkn":      "tkn",
+    "five":     "5h",
+    "week":     "7d",
+}
 
 _DEFAULTS: dict = {
     "thresholds": {
@@ -136,14 +226,15 @@ _DEFAULTS: dict = {
         "five": {"warn": 60, "crit": 80},
         "week": {"warn": 60, "crit": 80},
     },
-    "line1": {
-        "show_model":    True,
-        "show_effort":   True,
-        "show_thinking": True,
-        "show_ctx":      True,
-        "show_tkn":      True,
-        "show_five":     True,
-        "show_week":     True,
+    "line1": {},
+    "metrics": {
+        "model":    {"display": "text"},
+        "effort":   {"display": "text"},
+        "thinking": {"display": "text"},
+        "ctx":      {"display": "both"},
+        "tkn":      {"display": "text"},
+        "five":     {"display": "both"},
+        "week":     {"display": "both"},
     },
     "line2": {
         "show_dir":      True,
@@ -177,6 +268,32 @@ def cfg_visibility(config: dict, section: str, key: str) -> bool:
     return bool(config.get(section, {}).get(key, _DEFAULTS[section][key]))
 
 
+def cfg_decoration(config: dict) -> str:
+    """Global label/emoji choice. Falls back to legacy bar_mode_decoration key."""
+    val = config.get("decoration", config.get("bar_mode_decoration"))
+    return "label" if val == "label" else "emoji"
+
+
+def prefix(config: dict, metric: str, color: str, sep: str = " ") -> str:
+    """Leading decoration for any segment: emoji (no colour) or coloured word label."""
+    if cfg_decoration(config) == "label":
+        return f"{color}{_BAR_LABEL[metric]}{RESET}{sep}"
+    return f"{_BAR_EMOJI[metric]}{sep}"
+
+
+def cfg_display(config: dict, metric: str) -> str:
+    """Return the display mode for a metric: bar | text | both | off."""
+    val = config.get("metrics", {}).get(metric, {}).get("display")
+    if val in _DISPLAY_CHOICES:
+        return val
+    legacy = config.get("line1", {})
+    if f"show_{metric}" in legacy and not legacy.get(f"show_{metric}", True):
+        return "off"
+    if legacy.get(f"show_{metric}_bar"):
+        return "both"
+    return _DEFAULTS["metrics"][metric]["display"]
+
+
 def main() -> None:
     try:
         raw = sys.stdin.read()
@@ -199,23 +316,37 @@ def main() -> None:
 
     branch = git_branch(cwd)
     thinking_on = read_thinking_setting()
+
+    if model:
+        try:
+            _STATE_PATH.parent.mkdir(parents=True, exist_ok=True)
+            with _STATE_PATH.open("w", encoding="utf-8") as f:
+                json.dump({"last_model": model}, f)
+        except OSError:
+            pass
+
     is_haiku = "haiku" in model.lower()
 
     # --- line 1 ----------------------------------------------------------
     mc = model_color(model)
     ec = effort_color(effort)
 
+    config = load_config()
+
+    def text_prefix(metric: str, color: str) -> str:
+        if cfg_decoration(config) == "label":
+            return f"{color}{_BAR_LABEL[metric]}:{RESET}"
+        return f"{_BAR_EMOJI[metric]} "
+
     if is_haiku:
-        effort_segment = f"{DIM_GRAY}effort:{RESET}{DIM_GRAY}n/a{RESET}"
+        effort_segment = f"{text_prefix('effort', DIM_GRAY)}{DIM_GRAY}n/a{RESET}"
     else:
-        effort_segment = f"{ec}effort:{RESET}{ec}{effort}{RESET}"
+        effort_segment = f"{text_prefix('effort', ec)}{ec}{effort}{RESET}"
 
     if thinking_on:
-        thinking_segment = f"{THINKING_ON_COLOR}thinking:on{RESET}"
+        thinking_segment = f"{text_prefix('thinking', THINKING_ON_COLOR)}{THINKING_ON_COLOR}on{RESET}"
     else:
-        thinking_segment = f"{DIM_GRAY}thinking:off{RESET}"
-
-    config = load_config()
+        thinking_segment = f"{text_prefix('thinking', DIM_GRAY)}{DIM_GRAY}off{RESET}"
 
     ctx_warn,  ctx_crit  = cfg_threshold(config, "ctx")
     tkn_warn,  tkn_crit  = cfg_threshold(config, "tkn")
@@ -229,20 +360,65 @@ def main() -> None:
 
     v1 = lambda k: cfg_visibility(config, "line1", k)
     line1_parts = []
-    if v1("show_model"):
-        line1_parts.append(f"{mc}{model}{RESET}")
-    if v1("show_effort"):
-        line1_parts.append(effort_segment)
-    if v1("show_thinking"):
-        line1_parts.append(thinking_segment)
-    if v1("show_ctx"):
-        line1_parts.append(f"{ctx_c}ctx:{RESET}{ctx_c}{ctx}%{RESET}")
-    if v1("show_tkn"):
-        line1_parts.append(f"{tkn_c}tkn:{RESET}{tkn_c}{fmt_tokens(tkn)}{RESET}")
-    if v1("show_five"):
-        line1_parts.append(f"{five_c}5h:{RESET}{five_c}{five}%{RESET}")
-    if v1("show_week"):
-        line1_parts.append(f"{week_c}7d:{RESET}{week_c}{week}%{RESET}")
+
+    model_mode = cfg_display(config, "model")
+    if model_mode != "off":
+        m_text = f"{mc}{model}{RESET}"
+        m_bar = render_model_bar(model)
+        if model_mode == "bar":
+            line1_parts.append(f"{prefix(config, 'model', mc)}{m_bar}")
+        elif model_mode == "text":
+            line1_parts.append(f"{text_prefix('model', mc)}{m_text}")
+        else:
+            line1_parts.append(f"{text_prefix('model', mc)}{m_text} {m_bar}")
+
+    effort_mode = cfg_display(config, "effort")
+    if effort_mode != "off" and not is_haiku:
+        bar = render_effort_bar(effort)
+        text = f"{ec}{effort}{RESET}"
+        if effort_mode == "bar":
+            line1_parts.append(f"{prefix(config, 'effort', ec)}{bar}")
+        elif effort_mode == "text":
+            line1_parts.append(f"{text_prefix('effort', ec)}{text}")
+        else:
+            line1_parts.append(f"{text_prefix('effort', ec)}{bar} {text}")
+    elif is_haiku and effort_mode != "off":
+        if effort_mode == "bar":
+            line1_parts.append(f"{prefix(config, 'effort', DIM_GRAY)}{DIM_GRAY}n/a{RESET}")
+        else:
+            line1_parts.append(effort_segment)
+
+    thinking_mode = cfg_display(config, "thinking")
+    if thinking_mode != "off":
+        th_color = THINKING_ON_COLOR if thinking_on else DIM_GRAY
+        th_bar = render_thinking_bar(thinking_on)
+        if thinking_mode == "bar":
+            line1_parts.append(f"{prefix(config, 'thinking', th_color)}{th_bar}")
+        elif thinking_mode == "text":
+            line1_parts.append(thinking_segment)
+        else:
+            line1_parts.append(f"{text_prefix('thinking', th_color)}{th_bar} {th_color}{'on' if thinking_on else 'off'}{RESET}")
+
+    def metric_segment(metric: str, pct: int, color: str, text_value: str) -> str | None:
+        mode = cfg_display(config, metric)
+        if mode == "off":
+            return None
+        bar = render_bar(pct)
+        text = f"{color}{text_value}{RESET}"
+        if mode == "bar":
+            return f"{prefix(config, metric, color)}{bar}"
+        if mode == "text":
+            return f"{text_prefix(metric, color)}{text}"
+        return f"{text_prefix(metric, color)}{bar} {text}"
+
+    for seg in (
+        metric_segment("ctx",  ctx,     ctx_c,  f"{ctx}%"),
+        metric_segment("tkn",  tkn_pct, tkn_c,  fmt_tokens(tkn)),
+        metric_segment("five", five,    five_c, f"{five}%"),
+        metric_segment("week", week,    week_c, f"{week}%"),
+    ):
+        if seg is not None:
+            line1_parts.append(seg)
     line1 = SEP.join(line1_parts)
 
     # --- line 2 ----------------------------------------------------------

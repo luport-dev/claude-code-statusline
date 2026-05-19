@@ -5,14 +5,16 @@
     "five": {"warn": 60, "crit": 80},
     "week": {"warn": 60, "crit": 80}
   },
-  "line1": {
-    "show_model":    true,
-    "show_effort":   true,
-    "show_thinking": true,
-    "show_ctx":      true,
-    "show_tkn":      true,
-    "show_five":     true,
-    "show_week":     true
+  "line1": {},
+  "decoration": "emoji",
+  "metrics": {
+    "model":    {"display": "text"},
+    "effort":   {"display": "text"},
+    "thinking": {"display": "text"},
+    "ctx":      {"display": "both"},
+    "tkn":      {"display": "text"},
+    "five":     {"display": "both"},
+    "week":     {"display": "both"}
   },
   "line2": {
     "show_dir":      true,

@@ -12,8 +12,11 @@ import shutil
 from pathlib import Path
 
 CONFIG_PATH  = Path.home() / ".claude" / "statusline_config.json"
+STATE_PATH   = Path.home() / ".claude" / "statusline_state.json"
 INSTALL_SRC  = Path(__file__).parent.parent / "scripts" / "statusline.py"
 INSTALL_DEST = Path.home() / ".claude" / "statusline.py"
+
+DISPLAY_CHOICES = ("bar", "text", "both", "off")
 
 DEFAULTS: dict = {
     "thresholds": {
@@ -22,14 +25,16 @@ DEFAULTS: dict = {
         "five": {"warn": 60, "crit": 80},
         "week": {"warn": 60, "crit": 80},
     },
-    "line1": {
-        "show_model":    True,
-        "show_effort":   True,
-        "show_thinking": True,
-        "show_ctx":      True,
-        "show_tkn":      True,
-        "show_five":     True,
-        "show_week":     True,
+    "line1": {},
+    "decoration": "emoji",
+    "metrics": {
+        "model":    {"display": "text"},
+        "effort":   {"display": "text"},
+        "thinking": {"display": "text"},
+        "ctx":      {"display": "both"},
+        "tkn":      {"display": "text"},
+        "five":     {"display": "both"},
+        "week":     {"display": "both"},
     },
     "line2": {
         "show_dir":      True,
@@ -68,7 +73,7 @@ def deep_merge(base: dict, override: dict) -> dict:
     return result
 
 
-MENU_ITEMS = ["Thresholds", "Line 1 visibility", "Line 2 visibility"]
+MENU_ITEMS = ["Metrics visibility", "Metrics thresholds", "Git visibility", "Decoration (emoji/label)"]
 
 
 def draw_box(win: "curses.window", title: str) -> None:
@@ -119,19 +124,17 @@ def main_menu(stdscr: "curses.window", config: dict) -> tuple[dict, bool]:
             selected = (selected + 1) % len(MENU_ITEMS)
         elif key in (curses.KEY_ENTER, ord("\n"), ord("\r")):
             if selected == 0:
-                config = menu_thresholds(stdscr, config)
+                config = menu_metrics(stdscr, config)
             elif selected == 1:
-                config = menu_visibility(stdscr, config, "line1", "Line 1 Visibility", [
-                    ("show_model",    "model"),
-                    ("show_effort",   "effort"),
-                    ("show_thinking", "thinking"),
-                    ("show_ctx",      "ctx"),
-                    ("show_tkn",      "tkn"),
-                    ("show_five",     "5h"),
-                    ("show_week",     "7d"),
-                ])
+                config = menu_thresholds(stdscr, config)
             elif selected == 2:
-                config = menu_visibility(stdscr, config)
+                config = menu_visibility(stdscr, config, "line2", "Git visibility", [
+                    ("show_dir",      "dir"),
+                    ("show_branch",   "branch"),
+                    ("show_worktree", "worktree"),
+                ])
+            elif selected == 3:
+                config = menu_bar_decoration(stdscr, config)
 
 
 def menu_thresholds(stdscr: "curses.window", config: dict) -> dict:
@@ -215,12 +218,102 @@ def menu_thresholds(stdscr: "curses.window", config: dict) -> dict:
     return config
 
 
+def menu_metrics(stdscr: "curses.window", config: dict) -> dict:
+    curses.curs_set(0)
+    stdscr.keypad(True)
+
+    rows = [
+        ("model",    "model   "),
+        ("effort",   "effort  "),
+        ("thinking", "thinking"),
+        ("ctx",      "ctx     "),
+        ("tkn",      "tkn     "),
+        ("five",     "5h      "),
+        ("week",     "7d      "),
+    ]
+    metrics_cfg = config.get("metrics", {})
+    state: dict[str, str] = {}
+    for key, _ in rows:
+        val = metrics_cfg.get(key, {}).get("display")
+        if val not in DISPLAY_CHOICES:
+            val = DEFAULTS["metrics"][key]["display"]
+        state[key] = val
+
+    row = 0
+
+    while True:
+        stdscr.clear()
+        h, w = stdscr.getmaxyx()
+        draw_box(stdscr, "Metric display")
+
+        last = read_last_model()
+        sub = f"selected model: {last}" if last else "selected model: (unknown — run Claude Code once)"
+        stdscr.addstr(2, 2, sub, curses.A_DIM)
+
+        header_y = 4
+        stdscr.addstr(header_y, 2, "metric", curses.A_DIM)
+        for j, choice in enumerate(DISPLAY_CHOICES):
+            stdscr.addstr(header_y, 12 + j * 10, choice, curses.A_DIM)
+
+        for i, (key, lbl) in enumerate(rows):
+            y = header_y + 2 + i
+            attr_row = curses.A_REVERSE if i == row else curses.A_NORMAL
+            stdscr.addstr(y, 2, lbl, attr_row)
+            for j, choice in enumerate(DISPLAY_CHOICES):
+                mark = "(*)" if state[key] == choice else "( )"
+                attr = curses.A_BOLD if state[key] == choice else curses.A_NORMAL
+                if i == row and state[key] == choice:
+                    attr |= curses.A_REVERSE
+                stdscr.addstr(y, 12 + j * 10, mark, attr)
+
+        hint = "[↑↓] metric  [←→] mode  [b/t/o/h] set  [Esc] back"
+        stdscr.addstr(h - 2, max(2, (w - len(hint)) // 2), hint, curses.A_DIM)
+        stdscr.refresh()
+
+        key = stdscr.getch()
+        if key == 27:  # Esc
+            break
+        elif key == curses.KEY_UP:
+            row = (row - 1) % len(rows)
+        elif key == curses.KEY_DOWN:
+            row = (row + 1) % len(rows)
+        elif key == curses.KEY_LEFT:
+            cur = DISPLAY_CHOICES.index(state[rows[row][0]])
+            state[rows[row][0]] = DISPLAY_CHOICES[(cur - 1) % len(DISPLAY_CHOICES)]
+        elif key == curses.KEY_RIGHT:
+            cur = DISPLAY_CHOICES.index(state[rows[row][0]])
+            state[rows[row][0]] = DISPLAY_CHOICES[(cur + 1) % len(DISPLAY_CHOICES)]
+        elif key in (ord("b"), ord("B")):
+            state[rows[row][0]] = "bar"
+        elif key in (ord("t"), ord("T")):
+            state[rows[row][0]] = "text"
+        elif key in (ord("h"), ord("H")):
+            state[rows[row][0]] = "both"
+        elif key in (ord("o"), ord("O")):
+            state[rows[row][0]] = "off"
+
+    config = dict(config)
+    config["metrics"] = {k: {"display": state[k]} for k, _ in rows}
+    return config
+
+
+def read_last_model() -> str:
+    try:
+        if STATE_PATH.exists():
+            with STATE_PATH.open(encoding="utf-8") as f:
+                return str(json.load(f).get("last_model") or "")
+    except Exception:
+        pass
+    return ""
+
+
 def menu_visibility(
     stdscr: "curses.window",
     config: dict,
     section: str = "line2",
     title: str = "Line 2 Visibility",
     items: list | None = None,
+    subtitle: str = "",
 ) -> dict:
     if items is None:
         items = [
@@ -242,10 +335,15 @@ def menu_visibility(
         h, w = stdscr.getmaxyx()
         draw_box(stdscr, title)
 
+        row_offset = 2
+        if subtitle:
+            stdscr.addstr(2, 2, subtitle, curses.A_DIM)
+            row_offset = 4
+
         for i, (key, lbl) in enumerate(items):
             check = "x" if state[key] else " "
             attr = curses.A_REVERSE if i == selected else curses.A_NORMAL
-            stdscr.addstr(2 + i, 2, f"  [{check}] {lbl}", attr)
+            stdscr.addstr(row_offset + i, 2, f"  [{check}] {lbl}", attr)
 
         hint = "[↑↓] navigate  [Space/Enter] toggle  [Esc] back"
         stdscr.addstr(h - 2, max(2, (w - len(hint)) // 2), hint, curses.A_DIM)
@@ -264,6 +362,51 @@ def menu_visibility(
 
     config = dict(config)
     config[section] = {k: state[k] for k, _ in items}
+    return config
+
+
+def menu_bar_decoration(stdscr: "curses.window", config: dict) -> dict:
+    curses.curs_set(0)
+    stdscr.keypad(True)
+
+    choices = [
+        ("emoji", "emoji   (🤖 💪 💡 📦 🪙 🕔 📅)"),
+        ("label", "label   (model effort thinking ctx tkn 5h 7d)"),
+    ]
+    current = config.get("decoration", config.get("bar_mode_decoration", DEFAULTS["decoration"]))
+    if current not in ("emoji", "label"):
+        current = "emoji"
+    selected = 0 if current == "emoji" else 1
+
+    while True:
+        stdscr.clear()
+        h, w = stdscr.getmaxyx()
+        draw_box(stdscr, "Decoration")
+
+        stdscr.addstr(2, 2, "Prefix shown in front of each segment (all display modes):", curses.A_DIM)
+
+        for i, (_, lbl) in enumerate(choices):
+            mark = "(*)" if i == selected else "( )"
+            attr = curses.A_REVERSE if i == selected else curses.A_NORMAL
+            stdscr.addstr(4 + i, 2, f"  {mark} {lbl}", attr)
+
+        hint = "[↑↓] choose  [Enter/Space] select  [Esc] back"
+        stdscr.addstr(h - 2, max(2, (w - len(hint)) // 2), hint, curses.A_DIM)
+        stdscr.refresh()
+
+        key = stdscr.getch()
+        if key == 27:
+            break
+        elif key == curses.KEY_UP:
+            selected = (selected - 1) % len(choices)
+        elif key == curses.KEY_DOWN:
+            selected = (selected + 1) % len(choices)
+        elif key in (ord(" "), curses.KEY_ENTER, ord("\n"), ord("\r")):
+            pass  # selection is implicit by position
+
+    config = dict(config)
+    config["decoration"] = choices[selected][0]
+    config.pop("bar_mode_decoration", None)
     return config
 
 
