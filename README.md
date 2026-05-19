@@ -258,12 +258,12 @@ Pressing **Esc** with unsaved changes opens a confirmation dialog listing every 
 │   metric    bar       text      both      off                      │
 │                                                                    │
 │   model     ( )       (*)       ( )       ( )                      │
-│   effort    ( )       (*)       ( )       ( )                      │
+│   effort    (*)       ( )       ( )       ( )                      │
 │   thinking  ( )       (*)       ( )       ( )                      │
-│   context   ( )       ( )       (*)       ( )                      │
+│   context   (*)       ( )       ( )       ( )                      │
 │   tokens    ( )       (*)       ( )       ( )                      │
-│   5h        ( )       ( )       (*)       ( )                      │
-│   7d        ( )       ( )       (*)       ( )                      │
+│   5h        (*)       ( )       ( )       ( )                      │
+│   7d        (*)       ( )       ( )       ( )                      │
 │                                                                    │
 │   ↑↓ metric  ←→ mode  b/t/h/o set  esc back                        │
 ╰────────────────────────────────────────────────────────────────────╯
@@ -300,7 +300,7 @@ Pressing **Esc** with unsaved changes opens a confirmation dialog listing every 
 │                                                             │
 │   Prefix shown in front of each segment (all display modes):│
 │                                                             │
-│     (*) emoji   (🤖 💪 🧠 📦 🪙 🕔 📅)                       │
+│     (*) emoji   (🤖 💪 🧠 📦 🎫 🕔 📆)                       │
 │     ( ) label   (model effort thinking ctx tkn 5h 7d)       │
 │                                                             │
 │   ↑↓ choose  Ent/Spc select  esc back                       │
@@ -313,9 +313,9 @@ Pressing **Esc** with unsaved changes opens a confirmation dialog listing every 
 │                                                             │
 │   Glyphs used for filled / empty bar segments:              │
 │                                                             │
-│     (*) fill     ▰▰▰▰▰▱▱▱▱▱   (default)                     │
+│     ( ) fill     ▰▰▰▰▰▱▱▱▱▱                                 │
 │     ( ) block    █████░░░░░                                 │
-│     ( ) dot      ●●●●●○○○○○                                 │
+│     (*) dot      ●●●●●○○○○○   (default)                     │
 │     ( ) square   ■■■■■□□□□□                                 │
 │                                                             │
 │   ↑↓ choose  Ent/Spc select  esc back                       │
