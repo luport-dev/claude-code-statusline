@@ -37,10 +37,10 @@ if not defined PY (
     exit /b 1
 )
 
-rem --- Install windows-curses for the configure.py TUI ----------------
+rem --- Install windows-curses for the settings.py TUI -----------------
 %PY% -m pip install --quiet windows-curses
 if errorlevel 1 (
-    echo WARN: Could not install windows-curses. configure.py TUI may not work.
+    echo WARN: Could not install windows-curses. settings.py TUI may not work.
 )
 
 rem --- Locate git ----------------------------------------------------

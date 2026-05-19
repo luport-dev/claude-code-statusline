@@ -1,0 +1,189 @@
+#!/usr/bin/env python3
+"""Render every relevant status line variation in one go.
+
+Runs scripts/statusline.py against fixed JSON snapshots with different config
+overrides and prints each result with a heading. Intended for screenshotting.
+
+Usage:
+    python scripts/preview.py
+"""
+from __future__ import annotations
+
+import json
+import subprocess
+import sys
+from pathlib import Path
+
+try:
+    sys.stdout.reconfigure(encoding="utf-8")
+except Exception:
+    pass
+
+REPO = Path(__file__).resolve().parent.parent
+STATUSLINE = REPO / "scripts" / "statusline.py"
+CONFIG_PATH = Path.home() / ".claude" / "statusline_config.json"
+
+ESC = "\x1b"
+RESET = f"{ESC}[0m"
+BOLD = f"{ESC}[1m"
+DIM = f"{ESC}[2m"
+HEADER = f"{ESC}[1;38;5;39m"
+
+SCENARIOS = {
+    "low":    {"ctx": 12, "tkn": 12, "five": 18, "week": 8,  "tokens": 5_400},
+    "medium": {"ctx": 65, "tkn": 65, "five": 62, "week": 45, "tokens": 84_000},
+    "high":   {"ctx": 88, "tkn": 88, "five": 85, "week": 78, "tokens": 178_500},
+}
+
+MODELS = [
+    ("Opus 4.7",   "opus"),
+    ("Sonnet 4.6", "sonnet"),
+    ("Haiku 4.5",  "haiku"),
+]
+
+BAR_STYLES = ["fill", "block", "dot", "square"]
+DECORATIONS = ["emoji", "label"]
+DISPLAY_MODES = ["text", "bar", "both"]
+
+
+def make_input(model_name: str, effort: str, scenario: dict) -> str:
+    return json.dumps({
+        "cwd": str(REPO),
+        "worktree": {"name": "feat-statusline"},
+        "model": {"display_name": model_name},
+        "effort": {"level": effort},
+        "context_window": {
+            "used_percentage":     scenario["ctx"],
+            "total_input_tokens":  scenario["tokens"],
+        },
+        "rate_limits": {
+            "five_hour":  {"used_percentage": scenario["five"]},
+            "seven_day":  {"used_percentage": scenario["week"]},
+        },
+    })
+
+
+def render(config: dict, payload: str) -> str:
+    CONFIG_PATH.parent.mkdir(parents=True, exist_ok=True)
+    CONFIG_PATH.write_text(json.dumps(config), encoding="utf-8")
+    r = subprocess.run(
+        [sys.executable, str(STATUSLINE)],
+        input=payload,
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+    )
+    return r.stdout.rstrip("\n")
+
+
+def section(title: str) -> None:
+    print()
+    print(f"{HEADER}── {title} {'─' * max(0, 72 - len(title))}{RESET}")
+    print()
+
+
+def label(text: str) -> None:
+    print(f"{DIM}{text}{RESET}")
+
+
+def all_metrics(mode: str) -> dict:
+    return {k: {"display": mode} for k in
+            ("model", "effort", "thinking", "ctx", "tkn", "five", "week")}
+
+
+def main() -> None:
+    backup = CONFIG_PATH.read_text(encoding="utf-8") if CONFIG_PATH.exists() else None
+    try:
+        print(f"{BOLD}Claude Code Status Line — Preview{RESET}")
+        print(f"{DIM}Renders every relevant variation. Screenshot freely.{RESET}")
+
+        # 1. Threshold colour progression (low / medium / high) — default config
+        section("1. Threshold stages (low / medium / high usage)")
+        for stage, scen in SCENARIOS.items():
+            cfg = {
+                "decoration": "emoji",
+                "bar_style":  "fill",
+                "metrics":    all_metrics("both"),
+            }
+            payload = make_input("Sonnet 4.6", "high", scen)
+            label(f"  {stage}")
+            print(render(cfg, payload))
+            print()
+
+        # 2. Models (Opus / Sonnet / Haiku)
+        section("2. Models — colour coding")
+        for name, _ in MODELS:
+            cfg = {
+                "decoration": "emoji",
+                "bar_style":  "fill",
+                "metrics":    all_metrics("both"),
+            }
+            effort = "low" if "haiku" in name.lower() else "high"
+            payload = make_input(name, effort, SCENARIOS["medium"])
+            label(f"  {name}")
+            print(render(cfg, payload))
+            print()
+
+        # 3. Display modes (text / bar / both)
+        section("3. Display modes")
+        for mode in DISPLAY_MODES:
+            cfg = {
+                "decoration": "emoji",
+                "bar_style":  "fill",
+                "metrics":    all_metrics(mode),
+            }
+            payload = make_input("Sonnet 4.6", "high", SCENARIOS["medium"])
+            label(f"  display={mode}")
+            print(render(cfg, payload))
+            print()
+
+        # 4. Decoration: emoji vs label
+        section("4. Decoration — emoji vs label")
+        for deco in DECORATIONS:
+            cfg = {
+                "decoration": deco,
+                "bar_style":  "fill",
+                "metrics":    all_metrics("both"),
+            }
+            payload = make_input("Sonnet 4.6", "high", SCENARIOS["medium"])
+            label(f"  decoration={deco}")
+            print(render(cfg, payload))
+            print()
+
+        # 5. Bar styles (fill / block / dot / square)
+        section("5. Bar styles")
+        for style in BAR_STYLES:
+            cfg = {
+                "decoration": "emoji",
+                "bar_style":  style,
+                "metrics":    all_metrics("bar"),
+            }
+            payload = make_input("Sonnet 4.6", "high", SCENARIOS["medium"])
+            label(f"  bar_style={style}")
+            print(render(cfg, payload))
+            print()
+
+        # 6. Bar-only with both decorations (compact look)
+        section("6. Bar-only — emoji vs label prefix")
+        for deco in DECORATIONS:
+            cfg = {
+                "decoration": deco,
+                "bar_style":  "fill",
+                "metrics":    all_metrics("bar"),
+            }
+            payload = make_input("Sonnet 4.6", "high", SCENARIOS["medium"])
+            label(f"  decoration={deco}  display=bar")
+            print(render(cfg, payload))
+            print()
+    finally:
+        if backup is not None:
+            CONFIG_PATH.write_text(backup, encoding="utf-8")
+        else:
+            try:
+                CONFIG_PATH.unlink()
+            except FileNotFoundError:
+                pass
+
+
+if __name__ == "__main__":
+    main()

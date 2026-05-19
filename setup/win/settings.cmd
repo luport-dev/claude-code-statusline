@@ -2,7 +2,7 @@
 setlocal EnableExtensions EnableDelayedExpansion
 
 set "SCRIPT_DIR=%~dp0"
-set "CONFIGURE=%SCRIPT_DIR%..\configure.py"
+set "SETTINGS=%SCRIPT_DIR%..\settings.py"
 
 rem --- Locate Python interpreter -------------------------------------
 set "PY="
@@ -13,5 +13,5 @@ if not defined PY (
     exit /b 1
 )
 
-%PY% "%CONFIGURE%"
+%PY% "%SETTINGS%"
 endlocal

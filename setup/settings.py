@@ -27,6 +27,7 @@ DEFAULTS: dict = {
     },
     "line1": {},
     "decoration": "emoji",
+    "bar_style": "fill",
     "metrics": {
         "model":    {"display": "text"},
         "effort":   {"display": "text"},
@@ -73,7 +74,7 @@ def deep_merge(base: dict, override: dict) -> dict:
     return result
 
 
-MENU_ITEMS = ["Metrics visibility", "Metrics thresholds", "Git visibility", "Decoration (emoji/label)"]
+MENU_ITEMS = ["Metrics visibility", "Metrics thresholds", "Git visibility", "Decoration (emoji/label)", "Bar style"]
 
 
 def draw_box(win: "curses.window", title: str) -> None:
@@ -135,6 +136,8 @@ def main_menu(stdscr: "curses.window", config: dict) -> tuple[dict, bool]:
                 ])
             elif selected == 3:
                 config = menu_bar_decoration(stdscr, config)
+            elif selected == 4:
+                config = menu_bar_style(stdscr, config)
 
 
 def menu_thresholds(stdscr: "curses.window", config: dict) -> dict:
@@ -370,7 +373,7 @@ def menu_bar_decoration(stdscr: "curses.window", config: dict) -> dict:
     stdscr.keypad(True)
 
     choices = [
-        ("emoji", "emoji   (🤖 💪 💡 📦 🪙 🕔 📅)"),
+        ("emoji", "emoji   (🤖 💪 🧠 📦 🪙 🕔 📅)"),
         ("label", "label   (model effort thinking ctx tkn 5h 7d)"),
     ]
     current = config.get("decoration", config.get("bar_mode_decoration", DEFAULTS["decoration"]))
@@ -407,6 +410,50 @@ def menu_bar_decoration(stdscr: "curses.window", config: dict) -> dict:
     config = dict(config)
     config["decoration"] = choices[selected][0]
     config.pop("bar_mode_decoration", None)
+    return config
+
+
+def menu_bar_style(stdscr: "curses.window", config: dict) -> dict:
+    curses.curs_set(0)
+    stdscr.keypad(True)
+
+    choices = [
+        ("fill",   "fill     ▰▰▰▰▰▱▱▱▱▱   (default)"),
+        ("block",  "block    █████░░░░░"),
+        ("dot",    "dot      ●●●●●○○○○○"),
+        ("square", "square   ■■■■■□□□□□"),
+    ]
+    current = config.get("bar_style", DEFAULTS["bar_style"])
+    selected = next((i for i, (k, _) in enumerate(choices) if k == current), 0)
+
+    while True:
+        stdscr.clear()
+        h, w = stdscr.getmaxyx()
+        draw_box(stdscr, "Bar style")
+
+        stdscr.addstr(2, 2, "Glyphs used for filled / empty bar segments:", curses.A_DIM)
+
+        for i, (_, lbl) in enumerate(choices):
+            mark = "(*)" if i == selected else "( )"
+            attr = curses.A_REVERSE if i == selected else curses.A_NORMAL
+            stdscr.addstr(4 + i, 2, f"  {mark} {lbl}", attr)
+
+        hint = "[↑↓] choose  [Enter/Space] select  [Esc] back"
+        stdscr.addstr(h - 2, max(2, (w - len(hint)) // 2), hint, curses.A_DIM)
+        stdscr.refresh()
+
+        key = stdscr.getch()
+        if key == 27:
+            break
+        elif key == curses.KEY_UP:
+            selected = (selected - 1) % len(choices)
+        elif key == curses.KEY_DOWN:
+            selected = (selected + 1) % len(choices)
+        elif key in (ord(" "), curses.KEY_ENTER, ord("\n"), ord("\r")):
+            pass
+
+    config = dict(config)
+    config["bar_style"] = choices[selected][0]
     return config
 
 

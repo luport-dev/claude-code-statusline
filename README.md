@@ -7,7 +7,7 @@
 
 ## What is it?
 
-A two-line, colored status line for the **[Claude Code CLI](https://claude.ai/code)** that shows all relevant session data at a glance: 
+A two-line, colored status line for the **[Claude Code CLI](https://claude.ai/code)** that shows all relevant session data at a glance:
 - the current model (color-coded by type)
 - the effort level
 - thinking mode status
@@ -17,7 +17,9 @@ A two-line, colored status line for the **[Claude Code CLI](https://claude.ai/co
 - the active git branch
 - the active worktree (if applicable)
 
-Colors automatically shift from green to yellow to red as defined thresholds are crossed, making critical states immediately visible without interrupting Claude's output.
+Each metric can be shown as text, a coloured bar, both, or hidden. Colors automatically shift from green → yellow → red as configured thresholds are crossed, making critical states immediately visible without interrupting Claude's output.
+
+Every segment can be prefixed with either a compact emoji (🤖 💪 🧠 📦 🪙 🕔 📅 / 📁 ⎇ 🌳) or a word label, and bar glyphs are switchable between four styles — all configurable via an interactive TUI.
 
 ## How it Works
 
@@ -56,9 +58,55 @@ Colors automatically shift green → yellow → red depending on usage.
 | dir / branch / worktree values | 🟠 Warm bronze |
 
 
+## Display modes
+
+Each line 1 metric can be rendered in one of four modes (`text` / `bar` / `both` / `off`):
+
+| Mode | Example (ctx at 42%) |
+|------|----------------------|
+| `text` | `ctx: 42%` |
+| `bar` | `ctx ▰▰▰▰▱▱▱▱▱▱` |
+| `both` | `ctx ▰▰▰▰▱▱▱▱▱▱ 42%` |
+| `off` | *(hidden)* |
+
+Defaults: `ctx`, `5h`, `7d` use `both`; everything else uses `text`.
+
+
+## Decoration: emoji or label
+
+A single global switch controls whether every segment (on both lines) is prefixed with an **emoji** or a **word label**:
+
+| Segment | Emoji | Label |
+|---------|-------|-------|
+| model | 🤖 | `model` |
+| effort | 💪 | `effort` |
+| thinking | 🧠 | `thinking` |
+| ctx | 📦 | `ctx` |
+| tkn | 🪙 | `tkn` |
+| 5h | 🕔 | `5h` |
+| 7d | 📅 | `7d` |
+| dir | 📁 | `dir` |
+| branch | ⎇ | `branch` |
+| worktree | 🌳 | `worktree` |
+
+Default: `emoji`.
+
+
+## Bar style
+
+When a metric is shown as a bar (`bar` or `both` mode), the glyphs are configurable:
+
+| Style | Filled | Empty | Look |
+|-------|--------|-------|------|
+| `fill` *(default)* | ▰ | ▱ | Subtle, slightly rounded |
+| `block` | █ | ░ | Strong contrast, classic |
+| `dot` | ● | ○ | Battery-indicator style |
+| `square` | ■ | □ | Clean, geometric |
+
+
 ## Thresholds
 
-Default thresholds (configurable via `configure`):
+Default thresholds (configurable via `settings`):
 
 | Metric | Yellow at | Red at |
 |--------|-----------|--------|
@@ -68,24 +116,24 @@ Default thresholds (configurable via `configure`):
 | 7d rate limit | 60% | 80% |
 
 
-## Configuration
+## Settings
 
-Run the interactive configuration tool to customize thresholds and element visibility:
+Run the interactive settings TUI to customize thresholds, display modes, decoration, bar style, and element visibility:
 
 ```bash
 # Linux
-./setup/linux/configure.sh
+./setup/linux/settings.sh
 
 # macOS
-./setup/macos/configure.sh
+./setup/macos/settings.sh
 ```
 
 ```cmd
 # Windows (CMD)
-setup\win\configure.cmd
+setup\win\settings.cmd
 ```
 
-The TUI lets you adjust warning/critical thresholds for each metric and toggle which elements are visible on line 1 (model, effort, thinking, ctx, tkn, 5h, 7d) and line 2 (dir, branch, worktree). Settings are saved to `~/.claude/statusline_config.json`.
+All settings are saved to `~/.claude/statusline_config.json`.
 
 > On Windows, `windows-curses` is installed automatically by `install.cmd`.
 
@@ -93,14 +141,36 @@ The TUI lets you adjust warning/critical thresholds for each metric and toggle w
 ```
 ┌──────────────── Claude Code Status Line — Configuration ──────────────────┐
 │                                                                           │
-│  > 1. Thresholds                                                          │
-│    2. Line 1 visibility                                                   │
-│    3. Line 2 visibility                                                   │
+│  > 1. Metrics visibility                                                  │
+│    2. Metrics thresholds                                                  │
+│    3. Git visibility                                                      │
+│    4. Decoration (emoji/label)                                            │
+│    5. Bar style                                                           │
 │                                                                           │
 │             config: ~/.claude/statusline_config.json                      │
 │                                                                           │
 │  [↑↓] navigate  [Enter] open  [q] save & quit  [Esc] quit without saving  │
 └───────────────────────────────────────────────────────────────────────────┘
+```
+
+**Metrics visibility** — per-metric display mode
+```
+┌────────────────────────── Metric display ──────────────────────────┐
+│                                                                    │
+│   selected model: Sonnet 4.6                                       │
+│                                                                    │
+│   metric    bar       text      both      off                      │
+│                                                                    │
+│   model     ( )       (*)       ( )       ( )                      │
+│   effort    ( )       (*)       ( )       ( )                      │
+│   thinking  ( )       (*)       ( )       ( )                      │
+│   ctx       ( )       ( )       (*)       ( )                      │
+│   tkn       ( )       (*)       ( )       ( )                      │
+│   5h        ( )       ( )       (*)       ( )                      │
+│   7d        ( )       ( )       (*)       ( )                      │
+│                                                                    │
+│   [↑↓] metric  [←→] mode  [b/t/o/h] set  [Esc] back                │
+└────────────────────────────────────────────────────────────────────┘
 ```
 
 **Thresholds**
@@ -117,34 +187,45 @@ The TUI lets you adjust warning/critical thresholds for each metric and toggle w
 └──────────────────────────────────────────────────────────────────────┘
 ```
 
-**Line 1 visibility**
+**Git visibility** (line 2)
 ```
 ┌───────────────────────────────────────────────────┐
-│                  Line 1 Visibility                │
+│                   Git visibility                  │
 │                                                   │
-│  [x] model                                        │
-│  [x] effort                                       │
-│  [x] thinking                                     │
-│  [x] ctx                                          │
-│  [x] tkn                                          │
-│  [x] 5h                                           │
-│  [x] 7d                                           │
+│  [x] dir                                          │
+│  [x] branch                                       │
+│  [x] worktree                                     │
 │                                                   │
 │  [↑↓] navigate  [Space/Enter] toggle  [Esc] back  │
 └───────────────────────────────────────────────────┘
 ```
 
-**Line 2 visibility**
+**Decoration**
 ```
-┌───────────────────────────────────────────────────┐
-│                  Line 2 Visibility                │
-│                                                   │
-│  [x] dir                                          │
-│  [x] branch                                       │
-│  [ ] worktree                                     │
-│                                                   │
-│  [↑↓] navigate  [Space/Enter] toggle  [Esc] back  │
-└───────────────────────────────────────────────────┘
+┌──────────────────────── Decoration ─────────────────────────┐
+│                                                             │
+│   Prefix shown in front of each segment (all display modes):│
+│                                                             │
+│     (*) emoji   (🤖 💪 🧠 📦 🪙 🕔 📅)                       │
+│     ( ) label   (model effort thinking ctx tkn 5h 7d)       │
+│                                                             │
+│   [↑↓] choose  [Enter/Space] select  [Esc] back             │
+└─────────────────────────────────────────────────────────────┘
+```
+
+**Bar style**
+```
+┌──────────────────────── Bar style ──────────────────────────┐
+│                                                             │
+│   Glyphs used for filled / empty bar segments:              │
+│                                                             │
+│     (*) fill     ▰▰▰▰▰▱▱▱▱▱   (default)                     │
+│     ( ) block    █████░░░░░                                 │
+│     ( ) dot      ●●●●●○○○○○                                 │
+│     ( ) square   ■■■■■□□□□□                                 │
+│                                                             │
+│   [↑↓] choose  [Enter/Space] select  [Esc] back             │
+└─────────────────────────────────────────────────────────────┘
 ```
 
 
@@ -154,14 +235,14 @@ The TUI lets you adjust warning/critical thresholds for each metric and toggle w
 |------|-------------|
 | [`scripts/statusline.py`](scripts/statusline.py) | Status line script (all platforms) |
 | [`setup/_settings.py`](setup/_settings.py) | Shared settings helper |
-| [`setup/configure.py`](setup/configure.py) | Interactive configuration TUI |
+| [`setup/settings.py`](setup/settings.py) | Interactive configuration TUI |
 | [`setup/default_config.json`](setup/default_config.json) | Default configuration (copied on first install) |
 | [`setup/linux/install.sh`](setup/linux/install.sh) | Linux install |
-| [`setup/linux/configure.sh`](setup/linux/configure.sh) | Linux configure |
+| [`setup/linux/settings.sh`](setup/linux/settings.sh) | Linux settings |
 | [`setup/macos/install.sh`](setup/macos/install.sh) | macOS install |
-| [`setup/macos/configure.sh`](setup/macos/configure.sh) | macOS configure |
+| [`setup/macos/settings.sh`](setup/macos/settings.sh) | macOS settings |
 | [`setup/win/install.cmd`](setup/win/install.cmd) | Windows install |
-| [`setup/win/configure.cmd`](setup/win/configure.cmd) | Windows configure |
+| [`setup/win/settings.cmd`](setup/win/settings.cmd) | Windows settings |
 
 
 # Requirements
@@ -241,7 +322,7 @@ Requires `git` and Python 3.
 ```bash
 ./setup/linux/install.sh      # install
 ./setup/linux/uninstall.sh    # uninstall
-./setup/linux/configure.sh    # configure thresholds & visibility
+./setup/linux/settings.sh    # configure thresholds & visibility
 ```
 
 **Manual installation:**
@@ -269,7 +350,7 @@ Requires `git` and Python 3.
 ```bash
 ./setup/macos/install.sh      # install
 ./setup/macos/uninstall.sh    # uninstall
-./setup/macos/configure.sh    # configure thresholds & visibility
+./setup/macos/settings.sh    # configure thresholds & visibility
 ```
 
 **Manual installation:**
@@ -297,7 +378,7 @@ Requires `git`. Python 3 is installed automatically if missing.
 ```cmd
 setup\win\install.cmd      rem install
 setup\win\uninstall.cmd    rem uninstall
-setup\win\configure.cmd    rem configure thresholds & visibility
+setup\win\settings.cmd    rem configure thresholds & visibility
 ```
 
 The install script copies `statusline.py` to `%USERPROFILE%\.claude\statusline.py` and merges the `statusLine` entry into `settings.json` (existing files are backed up as `.bak.<timestamp>`). It also installs `windows-curses` so the configuration TUI works.

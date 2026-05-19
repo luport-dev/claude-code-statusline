@@ -74,18 +74,28 @@ _GRAD_G = (204, 195, 186, 196, 161, 126, 101,  76,  66,  57)
 _GRAD_B = (113,  89,  64,  15,  24,  34,  44,  60,  50,  43)
 _BAR_EMPTY_COLOR = f"{ESC}[38;2;80;80;80m"
 
+_NARROW_EMOJIS = {"🪾", "⎇"}
 
-def render_bar(pct: int, segments: int = 10) -> str:
+_BAR_GLYPHS = {
+    "fill":   ("▰", "▱"),
+    "block":  ("█", "░"),
+    "dot":    ("●", "○"),
+    "square": ("■", "□"),
+}
+
+
+def render_bar(pct: int, glyphs: tuple[str, str] = ("▰", "▱"), segments: int = 10) -> str:
     """Render a coloured progress bar for a 0-100 percentage."""
+    on, off = glyphs
     pct = max(0, min(100, pct))
     filled = pct * segments // 100
     out = []
     for i in range(segments):
         if i < filled:
             idx = min(i, len(_GRAD_R) - 1)
-            out.append(f"{ESC}[38;2;{_GRAD_R[idx]};{_GRAD_G[idx]};{_GRAD_B[idx]}m▰")
+            out.append(f"{ESC}[38;2;{_GRAD_R[idx]};{_GRAD_G[idx]};{_GRAD_B[idx]}m{on}")
         else:
-            out.append(f"{_BAR_EMPTY_COLOR}▱")
+            out.append(f"{_BAR_EMPTY_COLOR}{off}")
     out.append(RESET)
     return "".join(out)
 
@@ -117,31 +127,34 @@ def effort_color(level: str) -> str:
 _MODEL_ORDER = ("haiku", "sonnet", "opus")
 
 
-def render_model_bar(name: str) -> str:
+def render_model_bar(name: str, glyphs: tuple[str, str] = ("▰", "▱")) -> str:
     """3-segment bar (haiku, sonnet, opus). Only the active model's segment is coloured."""
+    on, off = glyphs
     n = (name or "").lower()
     active = next((m for m in _MODEL_ORDER if m in n), None)
     out = []
     for m in _MODEL_ORDER:
         if m == active:
-            out.append(f"{model_color(m)}▰")
+            out.append(f"{model_color(m)}{on}")
         else:
-            out.append(f"{_BAR_EMPTY_COLOR}▱")
+            out.append(f"{_BAR_EMPTY_COLOR}{off}")
     out.append(RESET)
     return "".join(out)
 
 
-def render_thinking_bar(on: bool) -> str:
+def render_thinking_bar(on_state: bool, glyphs: tuple[str, str] = ("▰", "▱")) -> str:
     """2-segment bar: left=off (red), right=on (green). Only one is coloured."""
+    on, off = glyphs
     red   = f"{ESC}[31m"
     green = f"{ESC}[32m"
-    if on:
-        return f"{_BAR_EMPTY_COLOR}▱{green}▰{RESET}"
-    return f"{red}▰{_BAR_EMPTY_COLOR}▱{RESET}"
+    if on_state:
+        return f"{_BAR_EMPTY_COLOR}{off}{green}{on}{RESET}"
+    return f"{red}{on}{_BAR_EMPTY_COLOR}{off}{RESET}"
 
 
-def render_effort_bar(level: str) -> str:
+def render_effort_bar(level: str, glyphs: tuple[str, str] = ("▰", "▱")) -> str:
     """4-segment bar (low → xhigh), filled up to the current level."""
+    on, off = glyphs
     try:
         filled = _EFFORT_LEVELS.index(level) + 1
     except ValueError:
@@ -149,9 +162,9 @@ def render_effort_bar(level: str) -> str:
     out = []
     for i, lvl in enumerate(_EFFORT_LEVELS):
         if i < filled:
-            out.append(f"{effort_color(lvl)}▰")
+            out.append(f"{effort_color(lvl)}{on}")
         else:
-            out.append(f"{_BAR_EMPTY_COLOR}▱")
+            out.append(f"{_BAR_EMPTY_COLOR}{off}")
     out.append(RESET)
     return "".join(out)
 
@@ -202,11 +215,14 @@ _DISPLAY_CHOICES = ("bar", "text", "both", "off")
 _BAR_EMOJI = {
     "model":    "🤖",
     "effort":   "💪",
-    "thinking": "💡",
+    "thinking": "🧠",
     "ctx":      "📦",
     "tkn":      "🪙",
     "five":     "🕔",
     "week":     "📅",
+    "dir":      "📁",
+    "branch":   "⎇",
+    "worktree": "🌳",
 }
 
 _BAR_LABEL = {
@@ -217,6 +233,9 @@ _BAR_LABEL = {
     "tkn":      "tkn",
     "five":     "5h",
     "week":     "7d",
+    "dir":      "dir",
+    "branch":   "branch",
+    "worktree": "worktree",
 }
 
 _DEFAULTS: dict = {
@@ -268,6 +287,11 @@ def cfg_visibility(config: dict, section: str, key: str) -> bool:
     return bool(config.get(section, {}).get(key, _DEFAULTS[section][key]))
 
 
+def cfg_bar_glyphs(config: dict) -> tuple[str, str]:
+    style = config.get("bar_style", "fill")
+    return _BAR_GLYPHS.get(style, _BAR_GLYPHS["fill"])
+
+
 def cfg_decoration(config: dict) -> str:
     """Global label/emoji choice. Falls back to legacy bar_mode_decoration key."""
     val = config.get("decoration", config.get("bar_mode_decoration"))
@@ -278,7 +302,9 @@ def prefix(config: dict, metric: str, color: str, sep: str = " ") -> str:
     """Leading decoration for any segment: emoji (no colour) or coloured word label."""
     if cfg_decoration(config) == "label":
         return f"{color}{_BAR_LABEL[metric]}{RESET}{sep}"
-    return f"{_BAR_EMOJI[metric]}{sep}"
+    emo = _BAR_EMOJI[metric]
+    pad = " " if emo in _NARROW_EMOJIS else ""
+    return f"{emo}{pad}{sep}"
 
 
 def cfg_display(config: dict, metric: str) -> str:
@@ -332,11 +358,14 @@ def main() -> None:
     ec = effort_color(effort)
 
     config = load_config()
+    glyphs = cfg_bar_glyphs(config)
 
     def text_prefix(metric: str, color: str) -> str:
         if cfg_decoration(config) == "label":
             return f"{color}{_BAR_LABEL[metric]}:{RESET}"
-        return f"{_BAR_EMOJI[metric]} "
+        emo = _BAR_EMOJI[metric]
+        pad = "  " if emo in _NARROW_EMOJIS else " "
+        return f"{emo}{pad}"
 
     if is_haiku:
         effort_segment = f"{text_prefix('effort', DIM_GRAY)}{DIM_GRAY}n/a{RESET}"
@@ -364,7 +393,7 @@ def main() -> None:
     model_mode = cfg_display(config, "model")
     if model_mode != "off":
         m_text = f"{mc}{model}{RESET}"
-        m_bar = render_model_bar(model)
+        m_bar = render_model_bar(model, glyphs)
         if model_mode == "bar":
             line1_parts.append(f"{prefix(config, 'model', mc)}{m_bar}")
         elif model_mode == "text":
@@ -374,7 +403,7 @@ def main() -> None:
 
     effort_mode = cfg_display(config, "effort")
     if effort_mode != "off" and not is_haiku:
-        bar = render_effort_bar(effort)
+        bar = render_effort_bar(effort, glyphs)
         text = f"{ec}{effort}{RESET}"
         if effort_mode == "bar":
             line1_parts.append(f"{prefix(config, 'effort', ec)}{bar}")
@@ -391,7 +420,7 @@ def main() -> None:
     thinking_mode = cfg_display(config, "thinking")
     if thinking_mode != "off":
         th_color = THINKING_ON_COLOR if thinking_on else DIM_GRAY
-        th_bar = render_thinking_bar(thinking_on)
+        th_bar = render_thinking_bar(thinking_on, glyphs)
         if thinking_mode == "bar":
             line1_parts.append(f"{prefix(config, 'thinking', th_color)}{th_bar}")
         elif thinking_mode == "text":
@@ -403,7 +432,7 @@ def main() -> None:
         mode = cfg_display(config, metric)
         if mode == "off":
             return None
-        bar = render_bar(pct)
+        bar = render_bar(pct, glyphs)
         text = f"{color}{text_value}{RESET}"
         if mode == "bar":
             return f"{prefix(config, metric, color)}{bar}"
@@ -434,7 +463,13 @@ def main() -> None:
         return f"…{value[-n:]}" if len(value) > n else value
 
     def field(name: str, value: str) -> str:
-        return f"{LABEL_COLOR}{name}: {RESET}{VALUE_COLOR}{trunc(value) or '-'}{RESET}"
+        if cfg_decoration(config) == "label":
+            head = f"{LABEL_COLOR}{_BAR_LABEL[name]}: {RESET}"
+        else:
+            emo = _BAR_EMOJI[name]
+            pad = "  " if emo in _NARROW_EMOJIS else " "
+            head = f"{emo}{pad}"
+        return f"{head}{VALUE_COLOR}{trunc(value) or '-'}{RESET}"
 
     line2_parts = []
     if show_dir:
