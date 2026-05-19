@@ -8,13 +8,26 @@ from __future__ import annotations
 
 import curses
 import json
+import platform
 import shutil
+import time
 from pathlib import Path
 
-CONFIG_PATH  = Path.home() / ".claude" / "statusline_config.json"
-STATE_PATH   = Path.home() / ".claude" / "statusline_state.json"
-INSTALL_SRC  = Path(__file__).parent.parent / "scripts" / "statusline.py"
-INSTALL_DEST = Path.home() / ".claude" / "statusline.py"
+CONFIG_PATH   = Path.home() / ".claude" / "statusline_config.json"
+STATE_PATH    = Path.home() / ".claude" / "statusline_state.json"
+SETTINGS_PATH = Path.home() / ".claude" / "settings.json"
+INSTALL_DEST  = Path.home() / ".claude" / "statusline.py"
+
+
+def _find_install_src() -> Path:
+    """Findet statusline.py: erst im Repo (../scripts/), dann neben settings.py (npm payload)."""
+    repo_src = Path(__file__).parent.parent / "scripts" / "statusline.py"
+    if repo_src.exists():
+        return repo_src
+    return Path(__file__).parent / "statusline.py"
+
+
+INSTALL_SRC = _find_install_src()
 
 DISPLAY_CHOICES = ("bar", "text", "both", "off")
 
@@ -72,6 +85,65 @@ def deep_merge(base: dict, override: dict) -> dict:
         else:
             result[k] = v
     return result
+
+
+def _status_line_command() -> str:
+    if platform.system() == "Windows":
+        return f"python {str(INSTALL_DEST).replace(chr(92), '/')}"
+    return f"python3 {INSTALL_DEST}"
+
+
+def is_installed() -> bool:
+    try:
+        if not SETTINGS_PATH.exists():
+            return False
+        with SETTINGS_PATH.open(encoding="utf-8") as f:
+            data = json.load(f)
+        return "statusLine" in data
+    except Exception:
+        return False
+
+
+def do_install() -> str:
+    try:
+        shutil.copy2(INSTALL_SRC, INSTALL_DEST)
+        data: dict = {}
+        if SETTINGS_PATH.exists():
+            try:
+                with SETTINGS_PATH.open(encoding="utf-8") as f:
+                    data = json.load(f) or {}
+            except Exception:
+                data = {}
+        data["statusLine"] = {"type": "command", "command": _status_line_command()}
+        if SETTINGS_PATH.exists():
+            backup = SETTINGS_PATH.with_name(f"{SETTINGS_PATH.name}.bak.{int(time.time())}")
+            shutil.copy2(SETTINGS_PATH, backup)
+        SETTINGS_PATH.parent.mkdir(parents=True, exist_ok=True)
+        with SETTINGS_PATH.open("w", encoding="utf-8") as f:
+            json.dump(data, f, indent=2, ensure_ascii=False)
+            f.write("\n")
+        return "Installed. Restart Claude Code to activate."
+    except Exception as e:
+        return f"Error: {e}"
+
+
+def do_uninstall() -> str:
+    try:
+        if not SETTINGS_PATH.exists():
+            return "Not installed."
+        with SETTINGS_PATH.open(encoding="utf-8") as f:
+            data = json.load(f) or {}
+        if "statusLine" not in data:
+            return "Not installed."
+        del data["statusLine"]
+        backup = SETTINGS_PATH.with_name(f"{SETTINGS_PATH.name}.bak.{int(time.time())}")
+        shutil.copy2(SETTINGS_PATH, backup)
+        with SETTINGS_PATH.open("w", encoding="utf-8") as f:
+            json.dump(data, f, indent=2, ensure_ascii=False)
+            f.write("\n")
+        return "Uninstalled. Restart Claude Code to deactivate."
+    except Exception as e:
+        return f"Error: {e}"
 
 
 MENU_ITEMS = [
@@ -286,13 +358,29 @@ def confirm_unsaved(stdscr: "curses.window", changes: list[str]) -> bool:
             return options[selected][1]
 
 
+def show_flash(stdscr: "curses.window", msg: str, attr: int) -> None:
+    """Zeigt eine kurze Statusmeldung und wartet auf Tastendruck."""
+    stdscr.clear()
+    h, w = stdscr.getmaxyx()
+    draw_box(stdscr, "Claude Code Status Line — Settings")
+    safe_addstr(stdscr, h // 2,     max(2, (w - len(msg)) // 2), msg, attr)
+    hint = "Press any key to continue"
+    safe_addstr(stdscr, h // 2 + 2, max(2, (w - len(hint)) // 2), hint, _attr(CP_DIM))
+    stdscr.refresh()
+    stdscr.getch()
+
+
 def main_menu(stdscr: "curses.window", config: dict, original: dict) -> tuple[dict, bool]:
     """Returns (config, save). save reflects user's choice on exit."""
     curses.curs_set(0)
     stdscr.keypad(True)
     selected = 0
+    # Gesamtanzahl Einträge = MENU_ITEMS + 1 Toggle-Eintrag
+    total = len(MENU_ITEMS) + 1
+    TOGGLE_IDX = len(MENU_ITEMS)
 
     while True:
+        installed = is_installed()
         stdscr.clear()
         h, w = stdscr.getmaxyx()
         draw_box(stdscr, "Claude Code Status Line — Settings")
@@ -304,6 +392,16 @@ def main_menu(stdscr: "curses.window", config: dict, original: dict) -> tuple[di
             safe_addstr(stdscr, y, 6, emo)
             label_attr = _attr(CP_ACCENT, bold=True) if i == selected else 0
             safe_addstr(stdscr, y, 11, item, label_attr)
+
+        # Toggle-Eintrag
+        toggle_y = 3 + TOGGLE_IDX * 2
+        toggle_label = "Uninstall" if installed else "Install"
+        toggle_emo   = "[x]" if installed else "[ ]"
+        toggle_attr  = _attr(CP_DANGER if installed else CP_OK, bold=(selected == TOGGLE_IDX))
+        pointer = ">" if selected == TOGGLE_IDX else " "
+        safe_addstr(stdscr, toggle_y, 3, pointer, _attr(CP_ACCENT, bold=True))
+        safe_addstr(stdscr, toggle_y, 6, toggle_emo, toggle_attr)
+        safe_addstr(stdscr, toggle_y, 11, toggle_label, toggle_attr)
 
         draw_divider(stdscr, h - 5)
         path_text = f"{CONFIG_PATH}"
@@ -338,9 +436,9 @@ def main_menu(stdscr: "curses.window", config: dict, original: dict) -> tuple[di
                 return config, True
             return config, False
         elif key == curses.KEY_UP:
-            selected = (selected - 1) % len(MENU_ITEMS)
+            selected = (selected - 1) % total
         elif key == curses.KEY_DOWN:
-            selected = (selected + 1) % len(MENU_ITEMS)
+            selected = (selected + 1) % total
         elif key in (curses.KEY_ENTER, ord("\n"), ord("\r")):
             if selected == 0:
                 config = menu_metrics(stdscr, config)
@@ -356,6 +454,13 @@ def main_menu(stdscr: "curses.window", config: dict, original: dict) -> tuple[di
                 config = menu_bar_decoration(stdscr, config)
             elif selected == 4:
                 config = menu_bar_style(stdscr, config)
+            elif selected == TOGGLE_IDX:
+                if installed:
+                    result = do_uninstall()
+                    show_flash(stdscr, result, _attr(CP_WARN, bold=True))
+                else:
+                    result = do_install()
+                    show_flash(stdscr, result, _attr(CP_OK, bold=True))
 
 
 def menu_thresholds(stdscr: "curses.window", config: dict) -> dict:

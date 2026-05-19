@@ -1,0 +1,30 @@
+{
+  "name": "claude-code-statusline",
+  "version": "0.1.0",
+  "description": "Two-line colored status line for Claude Code CLI",
+  "bin": {
+    "claude-code-statusline": "bin/cli.js"
+  },
+  "files": [
+    "bin/",
+    "payload/"
+  ],
+  "scripts": {
+    "prepack": "node bin/sync-payload.js"
+  },
+  "keywords": [
+    "claude",
+    "claude-code",
+    "statusline",
+    "cli"
+  ],
+  "author": "luport-dev",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/luport-dev/Claude-Code-CLI-StatusLine.git"
+  },
+  "engines": {
+    "node": ">=14"
+  }
+}
