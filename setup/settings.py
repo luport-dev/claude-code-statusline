@@ -77,6 +77,84 @@ def deep_merge(base: dict, override: dict) -> dict:
 MENU_ITEMS = ["Metrics visibility", "Metrics thresholds", "Git visibility", "Decoration (emoji/label)", "Bar style"]
 
 
+def diff_config(original: dict, current: dict) -> list[str]:
+    """Return human-readable list of changes between two configs."""
+    lines: list[str] = []
+
+    def walk(path: str, a, b) -> None:
+        if isinstance(a, dict) or isinstance(b, dict):
+            a = a if isinstance(a, dict) else {}
+            b = b if isinstance(b, dict) else {}
+            for key in sorted(set(a) | set(b)):
+                walk(f"{path}.{key}" if path else key, a.get(key), b.get(key))
+            return
+        if a != b:
+            if a is None:
+                lines.append(f"+ {path} = {b!r}")
+            elif b is None:
+                lines.append(f"- {path}  (was {a!r})")
+            else:
+                lines.append(f"~ {path}: {a!r} -> {b!r}")
+
+    walk("", original, current)
+    return lines
+
+
+def confirm_unsaved(stdscr: "curses.window", changes: list[str]) -> bool:
+    """Show unsaved-changes dialog. Returns True = save, False = discard."""
+    curses.curs_set(0)
+    stdscr.keypad(True)
+    selected = 0  # 0 = save, 1 = discard
+    options = [("Save changes", True), ("Discard changes", False)]
+
+    while True:
+        stdscr.clear()
+        h, w = stdscr.getmaxyx()
+        draw_box(stdscr, "Unsaved changes")
+
+        title = "You have unsaved changes:"
+        stdscr.addstr(2, max(2, (w - len(title)) // 2), title, curses.A_BOLD)
+
+        max_lines = max(1, h - 9)
+        shown = changes[:max_lines]
+        block_width = max((len(line) for line in shown), default=0)
+        if len(changes) > max_lines:
+            more = f"... and {len(changes) - max_lines} more"
+            block_width = max(block_width, len(more))
+        block_width = min(block_width, max(0, w - 4))
+        x_block = max(2, (w - block_width) // 2)
+        for i, line in enumerate(shown):
+            stdscr.addstr(4 + i, x_block, line[: max(0, w - x_block - 2)])
+        if len(changes) > max_lines:
+            more = f"... and {len(changes) - max_lines} more"
+            stdscr.addstr(4 + max_lines, x_block, more, curses.A_DIM)
+
+        y_opts = h - 4
+        opt_strs = [f" {label_} " for label_, _ in options]
+        opts_total = sum(len(s) for s in opt_strs) + 4 * (len(opt_strs) - 1)
+        x = max(2, (w - opts_total) // 2)
+        for i, opt_str in enumerate(opt_strs):
+            attr = curses.A_REVERSE if i == selected else curses.A_NORMAL
+            stdscr.addstr(y_opts, x, opt_str, attr)
+            x += len(opt_str) + 4
+
+        hint = "[←→] choose  [Enter] confirm  [s] save  [d] discard"
+        stdscr.addstr(h - 2, max(2, (w - len(hint)) // 2), hint, curses.A_DIM)
+        stdscr.refresh()
+
+        key = stdscr.getch()
+        if key in (curses.KEY_LEFT, curses.KEY_UP):
+            selected = (selected - 1) % len(options)
+        elif key in (curses.KEY_RIGHT, curses.KEY_DOWN):
+            selected = (selected + 1) % len(options)
+        elif key in (ord("s"), ord("S")):
+            return True
+        elif key in (ord("d"), ord("D")):
+            return False
+        elif key in (curses.KEY_ENTER, ord("\n"), ord("\r")):
+            return options[selected][1]
+
+
 def draw_box(win: "curses.window", title: str) -> None:
     win.box()
     h, w = win.getmaxyx()
@@ -84,8 +162,8 @@ def draw_box(win: "curses.window", title: str) -> None:
     win.addstr(0, max(2, (w - len(label)) // 2), label, curses.A_BOLD)
 
 
-def main_menu(stdscr: "curses.window", config: dict) -> tuple[dict, bool]:
-    """Returns (config, save). save=False when user pressed Esc."""
+def main_menu(stdscr: "curses.window", config: dict, original: dict) -> tuple[dict, bool]:
+    """Returns (config, save). save reflects user's choice on exit."""
     curses.curs_set(0)
     stdscr.keypad(True)
     selected = 0
@@ -102,7 +180,7 @@ def main_menu(stdscr: "curses.window", config: dict) -> tuple[dict, bool]:
 
         config_info = f"config: {CONFIG_PATH}"
         stdscr.addstr(h - 4, max(2, (w - len(config_info)) // 2), config_info, curses.A_DIM)
-        hint = "[↑↓] navigate  [Enter] open  [q] save & quit  [Esc] quit without saving"
+        hint = "[↑↓] navigate  [Enter] open  [q] save & quit  [Esc] quit (asks if unsaved)"
         stdscr.addstr(h - 2, max(2, (w - len(hint)) // 2), hint, curses.A_DIM)
         stdscr.refresh()
 
@@ -118,6 +196,11 @@ def main_menu(stdscr: "curses.window", config: dict) -> tuple[dict, bool]:
             stdscr.getch()
             return config, True
         elif key == 27:  # Esc
+            changes = diff_config(original, config)
+            if not changes:
+                return config, False
+            if confirm_unsaved(stdscr, changes):
+                return config, True
             return config, False
         elif key == curses.KEY_UP:
             selected = (selected - 1) % len(MENU_ITEMS)
@@ -145,10 +228,10 @@ def menu_thresholds(stdscr: "curses.window", config: dict) -> dict:
     stdscr.keypad(True)
 
     rows = [
-        ("ctx",  "ctx "),
-        ("tkn",  "tkn "),
-        ("five", "5h  "),
-        ("week", "7d  "),
+        ("ctx",  "context"),
+        ("tkn",  "tokens "),
+        ("five", "5h     "),
+        ("week", "7d     "),
     ]
     fields = ["warn", "crit"]
 
@@ -229,8 +312,8 @@ def menu_metrics(stdscr: "curses.window", config: dict) -> dict:
         ("model",    "model   "),
         ("effort",   "effort  "),
         ("thinking", "thinking"),
-        ("ctx",      "ctx     "),
-        ("tkn",      "tkn     "),
+        ("ctx",      "context "),
+        ("tkn",      "tokens  "),
         ("five",     "5h      "),
         ("week",     "7d      "),
     ]
@@ -462,8 +545,11 @@ _save_result: bool = False
 
 def run(stdscr: "curses.window") -> None:
     global _save_result
-    config = deep_merge(DEFAULTS, load_config())
-    config, _save_result = main_menu(stdscr, config)
+    raw = load_config()
+    raw.pop("bar_mode_decoration", None)
+    config = deep_merge(DEFAULTS, raw)
+    original = json.loads(json.dumps(config))
+    config, _save_result = main_menu(stdscr, config, original)
     if _save_result:
         save_config(config)
 

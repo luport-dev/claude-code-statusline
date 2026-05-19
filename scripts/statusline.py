@@ -301,6 +301,8 @@ def cfg_decoration(config: dict) -> str:
 def prefix(config: dict, metric: str, color: str, sep: str = " ") -> str:
     """Leading decoration for any segment: emoji (no colour) or coloured word label."""
     if cfg_decoration(config) == "label":
+        if metric == "model":
+            return ""
         return f"{color}{_BAR_LABEL[metric]}{RESET}{sep}"
     emo = _BAR_EMOJI[metric]
     pad = " " if emo in _NARROW_EMOJIS else ""
@@ -362,7 +364,9 @@ def main() -> None:
 
     def text_prefix(metric: str, color: str) -> str:
         if cfg_decoration(config) == "label":
-            return f"{color}{_BAR_LABEL[metric]}:{RESET}"
+            if metric == "model":
+                return ""
+            return f"{color}{_BAR_LABEL[metric]}:{RESET} "
         emo = _BAR_EMOJI[metric]
         pad = "  " if emo in _NARROW_EMOJIS else " "
         return f"{emo}{pad}"
@@ -457,10 +461,42 @@ def main() -> None:
     active        = sum([show_dir, show_branch, show_worktree])
 
     term_cols = shutil.get_terminal_size(fallback=(120, 24)).columns
-    n         = max(3, int(term_cols * 0.80) // max(1, active))
+    total_budget = max(3 * max(1, active), int(term_cols * 0.80))
 
-    def trunc(value: str) -> str:
-        return f"…{value[-n:]}" if len(value) > n else value
+    raw_items: list[tuple[str, str]] = []
+    if show_dir:
+        raw_items.append(("dir", cwd or "?"))
+    if show_branch:
+        raw_items.append(("branch", branch))
+    if show_worktree:
+        raw_items.append(("worktree", worktree))
+
+    # Two-pass allocation: equal share, donors release surplus, deficit items
+    # split the freed pool proportionally to how much extra they need.
+    if raw_items:
+        share = max(3, total_budget // len(raw_items))
+        needs = [len(v) for _, v in raw_items]
+        budgets = [min(share, need) for need in needs]
+        surplus = sum(share - b for b in budgets)
+        deficits = [max(0, need - share) for need in needs]
+        deficit_total = sum(deficits)
+        if surplus and deficit_total:
+            for i, d in enumerate(deficits):
+                if d:
+                    budgets[i] += surplus * d // deficit_total
+            leftover = surplus - sum(surplus * d // deficit_total for d in deficits)
+            for i, d in enumerate(deficits):
+                if leftover <= 0:
+                    break
+                if d:
+                    budgets[i] += 1
+                    leftover -= 1
+        widths = {name: budgets[i] for i, (name, _) in enumerate(raw_items)}
+    else:
+        widths = {}
+
+    def trunc(value: str, n: int) -> str:
+        return f"…{value[-(n - 1):]}" if len(value) > n and n > 1 else (value if len(value) <= n else value[-n:])
 
     def field(name: str, value: str) -> str:
         if cfg_decoration(config) == "label":
@@ -469,15 +505,10 @@ def main() -> None:
             emo = _BAR_EMOJI[name]
             pad = "  " if emo in _NARROW_EMOJIS else " "
             head = f"{emo}{pad}"
-        return f"{head}{VALUE_COLOR}{trunc(value) or '-'}{RESET}"
+        n = widths.get(name, 3)
+        return f"{head}{VALUE_COLOR}{trunc(value, n) or '-'}{RESET}"
 
-    line2_parts = []
-    if show_dir:
-        line2_parts.append(field("dir", cwd or "?"))
-    if show_branch:
-        line2_parts.append(field("branch", branch))
-    if show_worktree:
-        line2_parts.append(field("worktree", worktree))
+    line2_parts = [field(name, value) for name, value in raw_items]
     line2 = SEP.join(line2_parts) if line2_parts else ""
 
     print(line1)

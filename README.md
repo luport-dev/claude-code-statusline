@@ -28,16 +28,12 @@ Claude Code passes a JSON object to the status line via stdin. The script reads 
 
 ## Examples
 
-![Status line preview Haiku](screenshots/preview_haiku.png)
-
-![Status line preview Sonnet](screenshots/preview_sonnet.png)
-
-![Status line preview Opus](screenshots/preview_opus.png)
+![Status line preview Haiku](screenshots/samples.png)
 
 > *Example values for illustrating the color stages.*
 
 **Line 1** — Model (colored by type), effort, thinking status, context usage (`ctx`), token count (`tkn`), rate limits (5h / 7d)<br>
-**Line 2** — Working directory, git branch, active worktree (in bronze tones, truncated to fit terminal width)
+**Line 2** — Working directory, git branch, active worktree (in bronze tones, truncated to fit terminal width with dynamic, shared-space allocation — short segments release unused characters to long ones)
 
 Colors automatically shift green → yellow → red depending on usage.
 
@@ -139,19 +135,23 @@ All settings are saved to `~/.claude/statusline_config.json`.
 
 **Main menu**
 ```
-┌──────────────── Claude Code Status Line — Configuration ──────────────────┐
-│                                                                           │
-│  > 1. Metrics visibility                                                  │
-│    2. Metrics thresholds                                                  │
-│    3. Git visibility                                                      │
-│    4. Decoration (emoji/label)                                            │
-│    5. Bar style                                                           │
-│                                                                           │
-│             config: ~/.claude/statusline_config.json                      │
-│                                                                           │
-│  [↑↓] navigate  [Enter] open  [q] save & quit  [Esc] quit without saving  │
-└───────────────────────────────────────────────────────────────────────────┘
+┌──────────────── Claude Code Status Line — Configuration ────────────────────┐
+│                                                                             │
+│  > 1. Metrics visibility                                                    │
+│    2. Metrics thresholds                                                    │
+│    3. Git visibility                                                        │
+│    4. Decoration (emoji/label)                                              │
+│    5. Bar style                                                             │
+│                                                                             │
+│             config: ~/.claude/statusline_config.json                        │
+│                                                                             │
+│  [↑↓] navigate  [Enter] open  [q] save & quit  [Esc] quit (asks if unsaved) │
+└─────────────────────────────────────────────────────────────────────────────┘
 ```
+
+Pressing **Esc** with unsaved changes opens a confirmation dialog listing every
+modified value (e.g. `~ thresholds.ctx.warn: 60 -> 55`, `~ bar_style: 'fill' -> 'dot'`).
+Choose **Save changes** or **Discard changes** — shortcuts `s` / `d` work too.
 
 **Metrics visibility** — per-metric display mode
 ```
@@ -164,8 +164,8 @@ All settings are saved to `~/.claude/statusline_config.json`.
 │   model     ( )       (*)       ( )       ( )                      │
 │   effort    ( )       (*)       ( )       ( )                      │
 │   thinking  ( )       (*)       ( )       ( )                      │
-│   ctx       ( )       ( )       (*)       ( )                      │
-│   tkn       ( )       (*)       ( )       ( )                      │
+│   context   ( )       ( )       (*)       ( )                      │
+│   tokens    ( )       (*)       ( )       ( )                      │
 │   5h        ( )       ( )       (*)       ( )                      │
 │   7d        ( )       ( )       (*)       ( )                      │
 │                                                                    │
@@ -178,10 +178,10 @@ All settings are saved to `~/.claude/statusline_config.json`.
 ┌──────────────────────────────────────────────────────────────────────┐
 │                              Thresholds                              │
 │                                                                      │
-│  ctx   warn: [ 60]%          crit: [ 80]%                            │
-│  tkn   warn: [ 60]%          crit: [ 80]%                            │
-│  5h    warn: [ 60]%          crit: [ 80]%                            │
-│  7d    warn: [ 60]%          crit: [ 80]%                            │
+│  context warn: [ 60]%          crit: [ 80]%                          │
+│  tokens  warn: [ 60]%          crit: [ 80]%                          │
+│  5h      warn: [ 60]%          crit: [ 80]%                          │
+│  7d      warn: [ 60]%          crit: [ 80]%                          │
 │                                                                      │
 │  [↑↓] rows  [←→] fields  [0-9] edit  [Backspace] clear  [Esc] back   │
 └──────────────────────────────────────────────────────────────────────┘
@@ -206,7 +206,7 @@ All settings are saved to `~/.claude/statusline_config.json`.
 │                                                             │
 │   Prefix shown in front of each segment (all display modes):│
 │                                                             │
-│     (*) emoji   (🤖 💪 🧠 📦 🪙 🕔 📅)                       │
+│     (*) emoji   (🤖 💪 🧠 📦 🪙 🕔 📅)                   │
 │     ( ) label   (model effort thinking ctx tkn 5h 7d)       │
 │                                                             │
 │   [↑↓] choose  [Enter/Space] select  [Esc] back             │
@@ -219,7 +219,7 @@ All settings are saved to `~/.claude/statusline_config.json`.
 │                                                             │
 │   Glyphs used for filled / empty bar segments:              │
 │                                                             │
-│     (*) fill     ▰▰▰▰▰▱▱▱▱▱   (default)                     │
+│     (*) fill     ▰▰▰▰▰▱▱▱▱▱   (default)             │
 │     ( ) block    █████░░░░░                                 │
 │     ( ) dot      ●●●●●○○○○○                                 │
 │     ( ) square   ■■■■■□□□□□                                 │
