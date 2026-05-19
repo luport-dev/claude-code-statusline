@@ -266,7 +266,7 @@ def confirm_unsaved(stdscr: "curses.window", changes: list[str]) -> bool:
             x += len(opt_str) + 4
 
         draw_hint_pills(stdscr, h - 2, [
-            ("<>",  "choose"),
+            ("←→",  "choose"),
             ("Ent", "confirm"),
             ("s",   "save"),
             ("d",   "discard"),
@@ -310,7 +310,7 @@ def main_menu(stdscr: "curses.window", config: dict, original: dict) -> tuple[di
         safe_addstr(stdscr, h - 4, max(2, (w - len(path_text)) // 2), path_text, _attr(CP_DIM))
 
         draw_hint_pills(stdscr, h - 2, [
-            ("^v",  "navigate"),
+            ("↑↓",  "navigate"),
             ("Ent", "open"),
             ("q",   "save & quit"),
             ("esc", "quit"),
@@ -439,8 +439,8 @@ def menu_thresholds(stdscr: "curses.window", config: dict) -> dict:
                 safe_addstr(stdscr, y, x + len(field) + 3, shown, box_attr)
 
         draw_hint_pills(stdscr, h - 2, [
-            ("^v",    "row"),
-            ("<>",    "field"),
+            ("↑↓",    "row"),
+            ("←→",    "field"),
             ("+/-",   "±1"),
             ("PgUp/Dn", "±5"),
             ("0-9",   "type"),
@@ -583,8 +583,8 @@ def menu_metrics(stdscr: "curses.window", config: dict) -> dict:
                 safe_addstr(stdscr, y, 18 + j * 10, mark, attr)
 
         draw_hint_pills(stdscr, h - 2, [
-            ("^v",      "metric"),
-            ("<>",      "mode"),
+            ("↑↓",      "metric"),
+            ("←→",      "mode"),
             ("b/t/h/o", "set"),
             ("esc",     "back"),
         ])
@@ -621,7 +621,13 @@ def read_last_model() -> str:
     try:
         if STATE_PATH.exists():
             with STATE_PATH.open(encoding="utf-8") as f:
-                return str(json.load(f).get("last_model") or "")
+                d = json.load(f)
+            # Neues Format: last_data.model.display_name
+            model = (d.get("last_data") or {}).get("model", {}).get("display_name")
+            if model:
+                return str(model)
+            # Altes Format: last_model (Fallback)
+            return str(d.get("last_model") or "")
     except Exception:
         pass
     return ""
@@ -672,7 +678,7 @@ def menu_visibility(
             safe_addstr(stdscr, y, 10, lbl, lbl_attr)
 
         draw_hint_pills(stdscr, h - 2, [
-            ("^v",      "navigate"),
+            ("↑↓",      "navigate"),
             ("Spc/Ent", "toggle"),
             ("esc",     "back"),
         ])
@@ -727,7 +733,7 @@ def menu_bar_decoration(stdscr: "curses.window", config: dict) -> dict:
             safe_addstr(stdscr, y, 10, lbl, lbl_attr)
 
         draw_hint_pills(stdscr, h - 2, [
-            ("^v",      "choose"),
+            ("↑↓",      "choose"),
             ("Ent/Spc", "select"),
             ("esc",     "back"),
         ])
@@ -782,7 +788,7 @@ def menu_bar_style(stdscr: "curses.window", config: dict) -> dict:
             safe_addstr(stdscr, y, 10, lbl, lbl_attr)
 
         draw_hint_pills(stdscr, h - 2, [
-            ("^v",      "choose"),
+            ("↑↓",      "choose"),
             ("Ent/Spc", "select"),
             ("esc",     "back"),
         ])
