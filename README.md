@@ -170,8 +170,8 @@ There are two ways to launch the TUI:
 ## Option A — clone the repo *(recommended)*
 
 ```bash
-git clone https://github.com/luport-dev/Claude-Code-CLI-StatusLine.git
-cd Claude-Code-CLI-StatusLine
+git clone https://github.com/luport-dev/claude-code-statusline.git
+cd claude-code-statusline
 ```
 
 Then run the platform-specific launcher:
@@ -184,7 +184,11 @@ setup\win\setup.cmd       # Windows (CMD)
 
 All three are thin wrappers that just call `python3 setup/settings.py` (or `python` on Windows).
 
+From there pick **Install** from the main menu, configure as desired, then **q** to save and quit. Restart Claude Code afterwards.
+
 ## Option B — via npx
+
+> Requires **Node.js ≥ 14** (`node --version` to check). Install from [nodejs.org](https://nodejs.org) if needed.
 
 ```bash
 npx -y @luport-dev/claude-code-statusline
@@ -192,7 +196,7 @@ npx -y @luport-dev/claude-code-statusline
 
 This fetches the npm wrapper, locates `python3` (or `python` / `py` on Windows), and starts the TUI. From there pick **Install** from the main menu, configure as desired, then **q** to save and quit. Restart Claude Code afterwards.
 
-> Requires Node.js (any version ≥ 14) and Python 3. The `-y` flag auto-confirms npx's download prompt so the call never blocks.
+> The `-y` flag auto-confirms npx's download prompt so the call never blocks.
 
 ## Manual installation
 
@@ -298,8 +302,8 @@ Pressing **Esc** with unsaved changes opens a confirmation dialog listing every 
 │                                                             │
 │   Prefix shown in front of each segment (all display modes):│
 │                                                             │
-│     (*) emoji   (🤖 💪 🧠 📦 🎫 🕔 📆)                       │
-│     ( ) label   (model effort thinking ctx tkn 5h 7d)       │
+│     (*) emoji   🤖 💪 🧠 📦 🎫 🕔 📆                       │
+│     ( ) label   model effort thinking ctx tkn 5h 7d         │
 │                                                             │
 │   ↑↓ choose  Ent/Spc select  esc back                       │
 ╰─────────────────────────────────────────────────────────────╯

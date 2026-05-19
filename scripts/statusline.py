@@ -237,7 +237,7 @@ _CONFIG_PATH = Path.home() / ".claude" / "statusline_config.json"
 _STATE_PATH  = Path.home() / ".claude" / "statusline_state.json"
 _UPDATE_PATH = Path.home() / ".claude" / "statusline_update.json"
 
-_GITHUB_REPO = "luport-dev/Claude-Code-CLI-StatusLine"
+_GITHUB_REPO = "luport-dev/claude-code-statusline"
 _UPDATE_INTERVALS_SEC = {
     "daily":   24 * 3600,
     "weekly":  7 * 24 * 3600,
@@ -445,7 +445,7 @@ def _fetch_latest_release() -> str | None:
 def _update_check_worker() -> None:
     """Background thread: fetch latest release, update cache file."""
     cache = load_update_cache()
-    current = str(cache.get("current_version") or "0.1.0")
+    current = str(cache.get("current_version") or "0.1.1")
     latest = _fetch_latest_release()
     from datetime import datetime, timezone
     now_iso = datetime.now(timezone.utc).replace(microsecond=0).isoformat()
