@@ -17,6 +17,9 @@ CONFIG_PATH   = Path.home() / ".claude" / "statusline_config.json"
 STATE_PATH    = Path.home() / ".claude" / "statusline_state.json"
 SETTINGS_PATH = Path.home() / ".claude" / "settings.json"
 INSTALL_DEST  = Path.home() / ".claude" / "statusline.py"
+UPDATE_CACHE  = Path.home() / ".claude" / "statusline_update.json"
+
+UPDATE_CHOICES = ("never", "daily", "weekly", "monthly")
 
 
 def _find_install_src() -> Path:
@@ -56,7 +59,57 @@ DEFAULTS: dict = {
         "show_branch":   True,
         "show_worktree": True,
     },
+    "updates": {
+        "check": "weekly",
+    },
 }
+
+
+def _read_package_version() -> str:
+    """Locate package.json shipped with the repo/payload and return its version."""
+    here = Path(__file__).resolve().parent
+    for candidate in (
+        here.parent / "npm" / "package.json",
+        here / "package.json",
+        here.parent / "package.json",
+    ):
+        try:
+            if candidate.exists():
+                with candidate.open(encoding="utf-8") as f:
+                    return str(json.load(f).get("version") or "0.0.0")
+        except Exception:
+            continue
+    return "0.0.0"
+
+
+def write_update_cache_version() -> None:
+    """Seed/refresh the update cache's current_version on install."""
+    try:
+        data: dict = {}
+        if UPDATE_CACHE.exists():
+            try:
+                with UPDATE_CACHE.open(encoding="utf-8") as f:
+                    data = json.load(f) or {}
+            except Exception:
+                data = {}
+        data["current_version"] = _read_package_version()
+        UPDATE_CACHE.parent.mkdir(parents=True, exist_ok=True)
+        with UPDATE_CACHE.open("w", encoding="utf-8") as f:
+            json.dump(data, f, indent=2)
+            f.write("\n")
+    except OSError:
+        pass
+
+
+def load_update_cache() -> dict:
+    try:
+        if UPDATE_CACHE.exists():
+            with UPDATE_CACHE.open(encoding="utf-8") as f:
+                d = json.load(f)
+            return d if isinstance(d, dict) else {}
+    except Exception:
+        pass
+    return {}
 
 
 def load_config() -> dict:
@@ -123,6 +176,7 @@ def do_install() -> str:
         with SETTINGS_PATH.open("w", encoding="utf-8") as f:
             json.dump(data, f, indent=2, ensure_ascii=False)
             f.write("\n")
+        write_update_cache_version()
         return "Installed. Restart Claude Code to activate."
     except Exception as e:
         return f"Error: {e}"
@@ -153,6 +207,7 @@ MENU_ITEMS = [
     ("Git visibility",           "🌳"),
     ("Decoration (symbols/label)", "🎨"),
     ("Bar style",                "📊"),
+    ("Update checks",            "🔄"),
 ]
 
 
@@ -404,9 +459,22 @@ def main_menu(stdscr: "curses.window", config: dict, original: dict) -> tuple[di
         safe_addstr(stdscr, toggle_y, 6, toggle_emo, toggle_attr)
         safe_addstr(stdscr, toggle_y, 11, toggle_label, toggle_attr)
 
+        cache = load_update_cache()
+        hint_text = ""
+        if cache.get("update_available") and cache.get("latest_version"):
+            tag = str(cache["latest_version"])
+            if not tag.startswith(("v", "V")):
+                tag = f"v{tag}"
+            hint_text = f"⬆  Update available: {tag}"
+
         draw_divider(stdscr, h - 5)
-        path_text = f"{CONFIG_PATH}"
-        safe_addstr(stdscr, h - 4, max(2, (w - len(path_text)) // 2), path_text, _attr(CP_DIM))
+        if hint_text:
+            safe_addstr(stdscr, h - 4, max(2, (w - len(hint_text)) // 2), hint_text, _attr(CP_WARN, bold=True))
+            path_text = f"{CONFIG_PATH}"
+            safe_addstr(stdscr, h - 3, max(2, (w - len(path_text)) // 2), path_text, _attr(CP_DIM))
+        else:
+            path_text = f"{CONFIG_PATH}"
+            safe_addstr(stdscr, h - 4, max(2, (w - len(path_text)) // 2), path_text, _attr(CP_DIM))
 
         draw_hint_pills(stdscr, h - 2, [
             ("↑↓",  "navigate"),
@@ -455,6 +523,8 @@ def main_menu(stdscr: "curses.window", config: dict, original: dict) -> tuple[di
                 config = menu_bar_decoration(stdscr, config)
             elif selected == 4:
                 config = menu_bar_style(stdscr, config)
+            elif selected == 5:
+                config = menu_updates(stdscr, config)
             elif selected == TOGGLE_IDX:
                 if installed:
                     result = do_uninstall()
@@ -934,10 +1004,72 @@ def menu_bar_style(stdscr: "curses.window", config: dict) -> dict:
     return config
 
 
+def menu_updates(stdscr: "curses.window", config: dict) -> dict:
+    curses.curs_set(0)
+    stdscr.keypad(True)
+
+    choices = [
+        ("never",   "never     no update checks"),
+        ("daily",   "daily     check once per day"),
+        ("weekly",  "weekly    check once per week"),
+        ("monthly", "monthly   check once per month"),
+    ]
+    current = str(config.get("updates", {}).get("check", DEFAULTS["updates"]["check"])).lower()
+    if current not in UPDATE_CHOICES:
+        current = "weekly"
+    selected = next((i for i, (k, _) in enumerate(choices) if k == current), 2)
+
+    while True:
+        stdscr.clear()
+        h, w = stdscr.getmaxyx()
+        draw_box(stdscr, "Update checks")
+
+        sub = "How often to check GitHub for a new release"
+        safe_addstr(stdscr, 2, max(2, (w - len(sub)) // 2), sub, _attr(CP_DIM))
+
+        cache = load_update_cache()
+        cur_v  = cache.get("current_version") or "?"
+        last_v = cache.get("latest_version")  or "?"
+        info = f"installed: {cur_v}    latest: {last_v}"
+        safe_addstr(stdscr, 3, max(2, (w - len(info)) // 2), info, _attr(CP_DIM))
+
+        for i, (_, lbl) in enumerate(choices):
+            y = 5 + i * 2
+            row_active = (i == selected)
+            pointer = ">" if row_active else " "
+            safe_addstr(stdscr, y, 4, pointer, _attr(CP_ACCENT, bold=True))
+            radio = "(*)" if row_active else "( )"
+            radio_attr = _attr(CP_OK, bold=True) if row_active else _attr(CP_DIM)
+            safe_addstr(stdscr, y, 6, radio, radio_attr)
+            lbl_attr = _attr(CP_ACCENT, bold=True) if row_active else 0
+            safe_addstr(stdscr, y, 10, lbl, lbl_attr)
+
+        draw_hint_pills(stdscr, h - 2, [
+            ("↑↓",      "choose"),
+            ("Ent/Spc", "select"),
+            ("esc",     "back"),
+        ])
+        stdscr.refresh()
+
+        key = stdscr.getch()
+        if key == 27:
+            break
+        elif key == curses.KEY_UP:
+            selected = (selected - 1) % len(choices)
+        elif key == curses.KEY_DOWN:
+            selected = (selected + 1) % len(choices)
+        elif key in (ord(" "), curses.KEY_ENTER, ord("\n"), ord("\r")):
+            pass
+
+    config = dict(config)
+    config["updates"] = {"check": choices[selected][0]}
+    return config
+
+
 _save_result: bool = False
 
 
-MAX_TUI_H = 22
+MAX_TUI_H = 24
 MAX_TUI_W = 90
 
 

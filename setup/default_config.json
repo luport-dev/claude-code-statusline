@@ -21,5 +21,8 @@
     "show_dir":      true,
     "show_branch":   true,
     "show_worktree": true
+  },
+  "updates": {
+    "check": "weekly"
   }
 }

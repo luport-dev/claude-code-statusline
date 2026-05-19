@@ -235,6 +235,14 @@ def read_thinking_setting() -> bool:
 
 _CONFIG_PATH = Path.home() / ".claude" / "statusline_config.json"
 _STATE_PATH  = Path.home() / ".claude" / "statusline_state.json"
+_UPDATE_PATH = Path.home() / ".claude" / "statusline_update.json"
+
+_GITHUB_REPO = "luport-dev/Claude-Code-CLI-StatusLine"
+_UPDATE_INTERVALS_SEC = {
+    "daily":   24 * 3600,
+    "weekly":  7 * 24 * 3600,
+    "monthly": 30 * 24 * 3600,
+}
 
 _DISPLAY_CHOICES = ("bar", "text", "both", "off")
 
@@ -368,6 +376,138 @@ def save_state(data: dict) -> None:
         pass
 
 
+def _parse_version(v: str) -> tuple[int, ...]:
+    """Parse 'v1.2.3' or '1.2.3' → (1,2,3). Non-numeric parts become 0."""
+    s = (v or "").lstrip("vV").strip()
+    parts: list[int] = []
+    for chunk in s.split("."):
+        num = ""
+        for ch in chunk:
+            if ch.isdigit():
+                num += ch
+            else:
+                break
+        parts.append(int(num) if num else 0)
+    return tuple(parts) or (0,)
+
+
+def load_update_cache() -> dict:
+    try:
+        if _UPDATE_PATH.exists():
+            with _UPDATE_PATH.open(encoding="utf-8") as f:
+                d = json.load(f)
+            return d if isinstance(d, dict) else {}
+    except Exception:
+        pass
+    return {}
+
+
+def save_update_cache(data: dict) -> None:
+    try:
+        _UPDATE_PATH.parent.mkdir(parents=True, exist_ok=True)
+        tmp = _UPDATE_PATH.with_suffix(".tmp")
+        with tmp.open("w", encoding="utf-8") as f:
+            json.dump(data, f, indent=2)
+        tmp.replace(_UPDATE_PATH)
+    except OSError:
+        pass
+
+
+def _gh_get(url: str):
+    import urllib.request
+    import urllib.error
+    req = urllib.request.Request(url, headers={
+        "Accept": "application/vnd.github+json",
+        "User-Agent": "claude-code-statusline",
+    })
+    try:
+        with urllib.request.urlopen(req, timeout=3) as resp:
+            return json.load(resp)
+    except (urllib.error.URLError, urllib.error.HTTPError, OSError, ValueError, TimeoutError):
+        return None
+
+
+def _fetch_latest_release() -> str | None:
+    """Return the latest release tag from GitHub. Falls back to newest tag."""
+    payload = _gh_get(f"https://api.github.com/repos/{_GITHUB_REPO}/releases/latest")
+    if isinstance(payload, dict):
+        tag = payload.get("tag_name") or payload.get("name")
+        if tag:
+            return str(tag)
+    tags = _gh_get(f"https://api.github.com/repos/{_GITHUB_REPO}/tags?per_page=1")
+    if isinstance(tags, list) and tags:
+        name = tags[0].get("name") if isinstance(tags[0], dict) else None
+        if name:
+            return str(name)
+    return None
+
+
+def _update_check_worker() -> None:
+    """Background thread: fetch latest release, update cache file."""
+    cache = load_update_cache()
+    current = str(cache.get("current_version") or "0.0.0")
+    latest = _fetch_latest_release()
+    from datetime import datetime, timezone
+    now_iso = datetime.now(timezone.utc).replace(microsecond=0).isoformat()
+    if latest is None:
+        cache["last_checked"] = now_iso
+        save_update_cache(cache)
+        return
+    available = _parse_version(latest) > _parse_version(current)
+    cache.update({
+        "last_checked":     now_iso,
+        "latest_version":   latest,
+        "current_version":  current,
+        "update_available": available,
+    })
+    save_update_cache(cache)
+
+
+def maybe_trigger_update_check(config: dict) -> None:
+    """Spawn a daemon thread to refresh the update cache if interval elapsed."""
+    mode = str(config.get("updates", {}).get("check", "weekly")).lower()
+    if mode == "never":
+        return
+    interval = _UPDATE_INTERVALS_SEC.get(mode)
+    if interval is None:
+        return
+    cache = load_update_cache()
+    last = cache.get("last_checked")
+    if last:
+        try:
+            from datetime import datetime
+            last_dt = datetime.fromisoformat(str(last).replace("Z", "+00:00"))
+            from datetime import datetime as _dt, timezone as _tz
+            now = _dt.now(_tz.utc)
+            if last_dt.tzinfo is None:
+                from datetime import timezone as _tz2
+                last_dt = last_dt.replace(tzinfo=_tz2.utc)
+            if (now - last_dt).total_seconds() < interval:
+                return
+        except (ValueError, TypeError):
+            pass
+    import threading
+    t = threading.Thread(target=_update_check_worker, daemon=True)
+    t.start()
+
+
+def update_hint_segment(config: dict) -> str | None:
+    """Return rendered '⬆ vX.Y.Z' segment for line 2, or None."""
+    mode = str(config.get("updates", {}).get("check", "weekly")).lower()
+    if mode == "never":
+        return None
+    cache = load_update_cache()
+    if not cache.get("update_available"):
+        return None
+    latest = cache.get("latest_version") or ""
+    if not latest:
+        return None
+    tag = str(latest)
+    if not tag.startswith(("v", "V")):
+        tag = f"v{tag}"
+    return f"{DIM_GRAY}⬆ {tag}{RESET}"
+
+
 def main() -> None:
     try:
         raw = sys.stdin.read()
@@ -411,6 +551,7 @@ def main() -> None:
 
     config = load_config()
     glyphs = cfg_bar_glyphs(config)
+    maybe_trigger_update_check(config)
 
     def text_prefix(metric: str, color: str) -> str:
         if cfg_decoration(config) == "label":
@@ -559,6 +700,9 @@ def main() -> None:
         return f"{head}{VALUE_COLOR}{trunc(value, n) or '-'}{RESET}"
 
     line2_parts = [field(name, value) for name, value in raw_items]
+    hint = update_hint_segment(config)
+    if hint:
+        line2_parts.append(hint)
     line2 = SEP.join(line2_parts) if line2_parts else ""
 
     print(line1)
