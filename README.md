@@ -19,7 +19,9 @@ A two-line, colored status line for the **[Claude Code CLI](https://claude.ai/co
 
 Each metric can be shown as text, a coloured bar, both, or hidden. Colors automatically shift from green → yellow → red as configured thresholds are crossed, making critical states immediately visible without interrupting Claude's output.
 
-Every segment can be prefixed with either a compact emoji (🤖 💪 🧠 📦 🪙 🕔 📅 / 📁 ⎇ 🌳) or a word label, and bar glyphs are switchable between four styles — all configurable via an interactive TUI.
+Every segment can be prefixed with either a compact emoji (🤖 💪 🧠 📦 🎫 🕔 📆 / 📁 🌿 🌳) or a word label, and bar glyphs are switchable between four styles — all configurable via an interactive TUI.
+
+A built-in update checker also pings GitHub on a configurable interval (off / daily / weekly / monthly) and shows a small 🔔 hint in the status line when a new release is available.
 
 ## How it Works
 
@@ -65,7 +67,7 @@ Each line 1 metric can be rendered in one of four modes (`text` / `bar` / `both`
 | `both` | `ctx ▰▰▰▰▱▱▱▱▱▱ 42%` |
 | `off` | *(hidden)* |
 
-Defaults: `ctx`, `5h`, `7d` use `both`; everything else uses `text`.
+Defaults: `effort`, `ctx`, `5h`, `7d` use `bar`; `model`, `thinking`, `tkn` use `text`.
 
 
 ## Decoration: emoji or label
@@ -78,11 +80,11 @@ A single global switch controls whether every segment (on both lines) is prefixe
 | effort | 💪 | `effort` |
 | thinking | 🧠 | `thinking` |
 | ctx | 📦 | `ctx` |
-| tkn | 🪙 | `tkn` |
+| tkn | 🎫 | `tkn` |
 | 5h | 🕔 | `5h` |
-| 7d | 📅 | `7d` |
+| 7d | 📆 | `7d` |
 | dir | 📁 | `dir` |
-| branch | ⎇ | `branch` |
+| branch | 🌿 | `branch` |
 | worktree | 🌳 | `worktree` |
 
 Default: `emoji`.
@@ -94,9 +96,9 @@ When a metric is shown as a bar (`bar` or `both` mode), the glyphs are configura
 
 | Style | Filled | Empty | Look |
 |-------|--------|-------|------|
-| `fill` *(default)* | ▰ | ▱ | Subtle, slightly rounded |
+| `fill` | ▰ | ▱ | Subtle, slightly rounded |
 | `block` | █ | ░ | Strong contrast, classic |
-| `dot` | ● | ○ | Battery-indicator style |
+| `dot` *(default)* | ● | ○ | Battery-indicator style |
 | `square` | ■ | □ | Clean, geometric |
 
 
@@ -118,17 +120,7 @@ Everything — install, configure, uninstall — runs through a single interacti
 
 There are two ways to launch the TUI:
 
-## Option A — via npx (no clone needed)
-
-```bash
-npx -y claude-code-statusline
-```
-
-This fetches the npm wrapper, locates `python3` (or `python` / `py` on Windows), and starts the TUI. From there pick **Install** from the main menu, configure as desired, then **q** to save and quit. Restart Claude Code afterwards.
-
-> Requires Node.js (any version ≥ 14) and Python 3. The `-y` flag auto-confirms npx's download prompt so the call never blocks.
-
-## Option B — clone the repo
+## Option A — clone the repo *(recommended)*
 
 ```bash
 git clone https://github.com/luport-dev/Claude-Code-CLI-StatusLine.git
@@ -144,6 +136,18 @@ setup\win\setup.cmd       # Windows (CMD)
 ```
 
 All three are thin wrappers that just call `python3 setup/settings.py` (or `python` on Windows).
+
+## Option B — via npx *(not published yet)*
+
+> ⚠️ **Not yet available on the npm registry.** The npm wrapper exists in this repo (`npm/`) but `claude-code-statusline` has not been published yet. Until the first npm release this command will fail — use **Option A** instead.
+
+```bash
+npx -y claude-code-statusline
+```
+
+Once published, this will fetch the npm wrapper, locate `python3` (or `python` / `py` on Windows), and start the TUI. From there pick **Install** from the main menu, configure as desired, then **q** to save and quit. Restart Claude Code afterwards.
+
+> Requires Node.js (any version ≥ 14) and Python 3. The `-y` flag auto-confirms npx's download prompt so the call never blocks.
 
 ## Manual installation
 
@@ -238,6 +242,7 @@ The same TUI handles install/uninstall and all configuration. Settings are saved
 │    [/] Git visibility                                                       │
 │    [#] Decoration (emoji/label)                                             │
 │    [=] Bar style                                                            │
+│    [~] Update checks                                                        │
 │    [ ] Install      ← toggles to "[x] Uninstall" once registered            │
 │                                                                             │
 │             config: ~/.claude/statusline_config.json                        │
@@ -320,6 +325,25 @@ Pressing **Esc** with unsaved changes opens a confirmation dialog listing every 
 │   ↑↓ choose  Ent/Spc select  esc back                       │
 ╰─────────────────────────────────────────────────────────────╯
 ```
+
+
+**Update checks**
+```
+╭──────────────────────── Update checks ──────────────────────╮
+│                                                             │
+│   How often to check GitHub for a new release               │
+│   installed: 0.1.0    latest: 0.1.0                         │
+│                                                             │
+│     ( ) never     no update checks                          │
+│     ( ) daily     check once per day                        │
+│     (*) weekly    check once per week                       │
+│     ( ) monthly   check once per month                      │
+│                                                             │
+│   ↑↓ choose  Ent/Spc select  esc back                       │
+╰─────────────────────────────────────────────────────────────╯
+```
+
+When a newer release is available on GitHub, a small **🔔 v0.1.1 available** segment is appended to line 2 and a banner appears in the TUI's main menu. The check runs in a background thread (3 s timeout) so the status line never blocks. Result is cached in `~/.claude/statusline_update.json`. Default interval: `weekly`.
 
 
 ## Files
