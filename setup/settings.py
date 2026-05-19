@@ -21,10 +21,11 @@ INSTALL_DEST  = Path.home() / ".claude" / "statusline.py"
 
 def _find_install_src() -> Path:
     """Findet statusline.py: erst im Repo (../scripts/), dann neben settings.py (npm payload)."""
-    repo_src = Path(__file__).parent.parent / "scripts" / "statusline.py"
+    here = Path(__file__).resolve().parent
+    repo_src = here.parent / "scripts" / "statusline.py"
     if repo_src.exists():
         return repo_src
-    return Path(__file__).parent / "statusline.py"
+    return here / "statusline.py"
 
 
 INSTALL_SRC = _find_install_src()
@@ -147,11 +148,11 @@ def do_uninstall() -> str:
 
 
 MENU_ITEMS = [
-    ("Metrics visibility",       "[%]"),
-    ("Metrics thresholds",       "[!]"),
-    ("Git visibility",           "[/]"),
-    ("Decoration (emoji/label)", "[#]"),
-    ("Bar style",                "[=]"),
+    ("Metrics visibility",       "👀"),
+    ("Metrics thresholds",       "🚦"),
+    ("Git visibility",           "🌳"),
+    ("Decoration (symbols/label)", "🎨"),
+    ("Bar style",                "📊"),
 ]
 
 
@@ -396,7 +397,7 @@ def main_menu(stdscr: "curses.window", config: dict, original: dict) -> tuple[di
         # Toggle-Eintrag
         toggle_y = 3 + TOGGLE_IDX * 2
         toggle_label = "Uninstall" if installed else "Install"
-        toggle_emo   = "[x]" if installed else "[ ]"
+        toggle_emo   = "📤" if installed else "📥"
         toggle_attr  = _attr(CP_DANGER if installed else CP_OK, bold=(selected == TOGGLE_IDX))
         pointer = ">" if selected == TOGGLE_IDX else " "
         safe_addstr(stdscr, toggle_y, 3, pointer, _attr(CP_ACCENT, bold=True))
@@ -446,9 +447,9 @@ def main_menu(stdscr: "curses.window", config: dict, original: dict) -> tuple[di
                 config = menu_thresholds(stdscr, config)
             elif selected == 2:
                 config = menu_visibility(stdscr, config, "line2", "Git visibility", [
-                    ("show_dir",      "dir"),
-                    ("show_branch",   "branch"),
-                    ("show_worktree", "worktree"),
+                    ("show_dir",      "dir",      "📁"),
+                    ("show_branch",   "branch",   "🌿"),
+                    ("show_worktree", "worktree", "🌳"),
                 ])
             elif selected == 3:
                 config = menu_bar_decoration(stdscr, config)
@@ -468,16 +469,17 @@ def menu_thresholds(stdscr: "curses.window", config: dict) -> dict:
     stdscr.keypad(True)
 
     rows = [
-        ("ctx",  "context"),
-        ("tkn",  "tokens "),
-        ("five", "5h     "),
-        ("week", "7d     "),
+        ("ctx",  "context", "📦"),
+        ("tkn",  "tokens",  "🎫"),
+        ("five", "5h",      "🕔"),
+        ("week", "7d",      "📆"),
     ]
     fields = ["warn", "crit"]
+    field_labels = {"warn": "warn", "crit": "critical"}
 
     t = config.get("thresholds", {})
     values: dict[str, dict[str, int]] = {}
-    for key, _ in rows:
+    for key, _, _ in rows:
         d = DEFAULTS["thresholds"][key]
         try:
             wv = int(t.get(key, {}).get("warn", d["warn"]))
@@ -525,23 +527,29 @@ def menu_thresholds(stdscr: "curses.window", config: dict) -> dict:
         safe_addstr(stdscr, 2, max(2, (w - len(subtitle)) // 2), subtitle, _attr(CP_DIM))
 
         y_base = 4
-        for i, (key, lbl) in enumerate(rows):
+        for i, (key, lbl, emo) in enumerate(rows):
             y = y_base + i
             row_active = (i == row)
-            safe_addstr(stdscr, y, 4, lbl, _attr(CP_ACCENT, bold=True) if row_active else 0)
+            safe_addstr(stdscr, y, 4, emo + " ")
+            safe_addstr(stdscr, y, 9, lbl, _attr(CP_ACCENT, bold=True) if row_active else 0)
+            warn_x = 18
+            crit_x = 36
             for j, field in enumerate(fields):
-                x = 14 + j * 22
+                x = warn_x if field == "warn" else crit_x
                 val = values[key][field]
                 cell_active = row_active and (j == col)
                 field_color = CP_WARN if field == "warn" else CP_DANGER
-                safe_addstr(stdscr, y, x, f"{field}:", _attr(field_color, bold=True))
+                field_emo = "🟡" if field == "warn" else "🔴"
+                flabel = field_labels[field]
+                safe_addstr(stdscr, y, x, field_emo + " ")
+                safe_addstr(stdscr, y, x + 3, f"{flabel}:", _attr(field_color, bold=True))
                 bracket = ">" if cell_active else " "
-                safe_addstr(stdscr, y, x + len(field) + 2, bracket, _attr(CP_ACCENT, bold=True))
+                safe_addstr(stdscr, y, x + 3 + len(flabel) + 2, bracket, _attr(CP_ACCENT, bold=True))
                 box_attr = _attr(CP_VALUE, bold=True) if cell_active else _attr(CP_VALUE)
                 shown = f"{val:>3}%"
                 if cell_active and digit_buffer:
                     shown = f"{int(digit_buffer):>3}%"
-                safe_addstr(stdscr, y, x + len(field) + 3, shown, box_attr)
+                safe_addstr(stdscr, y, x + 3 + len(flabel) + 3, shown, box_attr)
 
         draw_hint_pills(stdscr, h - 2, [
             ("↑↓",    "row"),
@@ -617,7 +625,7 @@ def menu_thresholds(stdscr: "curses.window", config: dict) -> dict:
                     digit_buffer = ""
 
     new_thresholds = dict(config.get("thresholds", {}))
-    for key, _ in rows:
+    for key, _, _ in rows:
         clamp(key)
         new_thresholds[key] = {"warn": values[key]["warn"], "crit": values[key]["crit"]}
 
@@ -649,10 +657,15 @@ def menu_metrics(stdscr: "curses.window", config: dict) -> dict:
 
     row = 0
 
-    # ASCII glyphs — curses on Windows uses cp1252; emojis don't render reliably.
+    # Matches the emojis used in the rendered status line itself.
     metric_glyph = {
-        "model": "M",  "effort": "E",  "thinking": "T",
-        "ctx":   "C",  "tkn":    "K",  "five":     "5", "week": "7",
+        "model":    "🤖",
+        "effort":   "💪",
+        "thinking": "🧠",
+        "ctx":      "📦",
+        "tkn":      "🎫",
+        "five":     "🕔",
+        "week":     "📆",
     }
 
     while True:
@@ -674,9 +687,9 @@ def menu_metrics(stdscr: "curses.window", config: dict) -> dict:
             row_active = (i == row)
             pointer = ">" if row_active else " "
             safe_addstr(stdscr, y, 2, pointer, _attr(CP_ACCENT, bold=True))
-            safe_addstr(stdscr, y, 4, f"[{metric_glyph.get(key, '?')}]", _attr(CP_DIM))
+            safe_addstr(stdscr, y, 4, metric_glyph.get(key, "?") + " ")
             lbl_attr = _attr(CP_ACCENT, bold=True) if row_active else 0
-            safe_addstr(stdscr, y, 8, lbl.strip(), lbl_attr)
+            safe_addstr(stdscr, y, 9, lbl.strip(), lbl_attr)
             for j, choice in enumerate(DISPLAY_CHOICES):
                 selected_mark = state[key] == choice
                 if selected_mark:
@@ -748,16 +761,19 @@ def menu_visibility(
 ) -> dict:
     if items is None:
         items = [
-            ("show_dir",      "dir"),
-            ("show_branch",   "branch"),
-            ("show_worktree", "worktree"),
+            ("show_dir",      "dir",      "📁"),
+            ("show_branch",   "branch",   "🌿"),
+            ("show_worktree", "worktree", "🌳"),
         ]
+    # Normalize: items may be (key, lbl) or (key, lbl, emoji)
+    norm_items = [(it + ("",)) if len(it) == 2 else it for it in items]
+
     curses.curs_set(0)
     stdscr.keypad(True)
 
     sec = config.get(section, {})
     state: dict[str, bool] = {
-        k: bool(sec.get(k, DEFAULTS[section][k])) for k, _ in items
+        k: bool(sec.get(k, DEFAULTS[section][k])) for k, _, _ in norm_items
     }
     selected = 0
 
@@ -771,7 +787,7 @@ def menu_visibility(
             safe_addstr(stdscr, 2, max(2, (w - len(subtitle)) // 2), subtitle, _attr(CP_DIM))
             row_offset = 4
 
-        for i, (key, lbl) in enumerate(items):
+        for i, (key, lbl, emo) in enumerate(norm_items):
             y = row_offset + i
             row_active = (i == selected)
             pointer = ">" if row_active else " "
@@ -779,8 +795,12 @@ def menu_visibility(
             check = "[x]" if state[key] else "[ ]"
             check_attr = _attr(CP_OK, bold=True) if state[key] else _attr(CP_DIM)
             safe_addstr(stdscr, y, 6, check, check_attr)
-            lbl_attr = _attr(CP_ACCENT, bold=True) if row_active else 0
-            safe_addstr(stdscr, y, 10, lbl, lbl_attr)
+            if emo:
+                safe_addstr(stdscr, y, 10, emo + " ")
+                safe_addstr(stdscr, y, 13, lbl, _attr(CP_ACCENT, bold=True) if row_active else 0)
+            else:
+                lbl_attr = _attr(CP_ACCENT, bold=True) if row_active else 0
+                safe_addstr(stdscr, y, 10, lbl, lbl_attr)
 
         draw_hint_pills(stdscr, h - 2, [
             ("↑↓",      "navigate"),
@@ -801,7 +821,7 @@ def menu_visibility(
             state[k] = not state[k]
 
     config = dict(config)
-    config[section] = {k: state[k] for k, _ in items}
+    config[section] = {k: state[k] for k, *_ in items}
     return config
 
 
@@ -810,8 +830,8 @@ def menu_bar_decoration(stdscr: "curses.window", config: dict) -> dict:
     stdscr.keypad(True)
 
     choices = [
-        ("emoji", "emoji   (🤖 💪 🧠 📦 🪙 🕔 📅)"),
-        ("label", "label   (model effort thinking ctx tkn 5h 7d)"),
+        ("emoji", "symbols   🤖 | 💪 | 🧠 | 📦 | 🎫 | 🕔 | 📆"),
+        ("label", "label     model | effort | thinking | ctx | tkn | 5h | 7d"),
     ]
     current = config.get("decoration", config.get("bar_mode_decoration", DEFAULTS["decoration"]))
     if current not in ("emoji", "label"):
@@ -865,7 +885,7 @@ def menu_bar_style(stdscr: "curses.window", config: dict) -> dict:
     stdscr.keypad(True)
 
     choices = [
-        ("fill",   "fill     ▰▰▰▰▰▱▱▱▱▱   (default)"),
+        ("fill",   "fill     ▰▰▰▰▰▱▱▱▱▱"),
         ("block",  "block    █████░░░░░"),
         ("dot",    "dot      ●●●●●○○○○○"),
         ("square", "square   ■■■■■□□□□□"),

@@ -90,7 +90,7 @@ _GRAD_G = (204, 195, 186, 196, 161, 126, 101,  76,  66,  57)
 _GRAD_B = (113,  89,  64,  15,  24,  34,  44,  60,  50,  43)
 _BAR_EMPTY_COLOR = f"{ESC}[38;2;80;80;80m"
 
-_NARROW_EMOJIS = {"🪾", "⎇"}
+_NARROW_EMOJIS = {"🪾"}
 
 _BAR_GLYPHS = {
     "fill":   ("▰", "▱"),
@@ -243,11 +243,11 @@ _BAR_EMOJI = {
     "effort":   "💪",
     "thinking": "🧠",
     "ctx":      "📦",
-    "tkn":      "🪙",
+    "tkn":      "🎫",
     "five":     "🕔",
-    "week":     "📅",
+    "week":     "📆",
     "dir":      "📁",
-    "branch":   "⎇",
+    "branch":   "🌿",
     "worktree": "🌳",
 }
 
