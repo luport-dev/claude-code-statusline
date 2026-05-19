@@ -282,12 +282,12 @@ _DEFAULTS: dict = {
     "line1": {},
     "metrics": {
         "model":    {"display": "text"},
-        "effort":   {"display": "text"},
+        "effort":   {"display": "bar"},
         "thinking": {"display": "text"},
-        "ctx":      {"display": "both"},
+        "ctx":      {"display": "bar"},
         "tkn":      {"display": "text"},
-        "five":     {"display": "both"},
-        "week":     {"display": "both"},
+        "five":     {"display": "bar"},
+        "week":     {"display": "bar"},
     },
     "line2": {
         "show_dir":      True,
@@ -322,8 +322,8 @@ def cfg_visibility(config: dict, section: str, key: str) -> bool:
 
 
 def cfg_bar_glyphs(config: dict) -> tuple[str, str]:
-    style = config.get("bar_style", "fill")
-    return _BAR_GLYPHS.get(style, _BAR_GLYPHS["fill"])
+    style = config.get("bar_style", "dot")
+    return _BAR_GLYPHS.get(style, _BAR_GLYPHS["dot"])
 
 
 def cfg_decoration(config: dict) -> str:

@@ -7,7 +7,7 @@
   },
   "line1": {},
   "decoration": "emoji",
-  "bar_style": "fill",
+  "bar_style": "dot",
   "metrics": {
     "model":    {"display": "text"},
     "effort":   {"display": "bar"},
