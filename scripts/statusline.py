@@ -445,7 +445,7 @@ def _fetch_latest_release() -> str | None:
 def _update_check_worker() -> None:
     """Background thread: fetch latest release, update cache file."""
     cache = load_update_cache()
-    current = str(cache.get("current_version") or "0.0.0")
+    current = str(cache.get("current_version") or "0.1.0")
     latest = _fetch_latest_release()
     from datetime import datetime, timezone
     now_iso = datetime.now(timezone.utc).replace(microsecond=0).isoformat()

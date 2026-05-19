@@ -76,10 +76,10 @@ def _read_package_version() -> str:
         try:
             if candidate.exists():
                 with candidate.open(encoding="utf-8") as f:
-                    return str(json.load(f).get("version") or "0.0.0")
+                    return str(json.load(f).get("version") or "0.1.0")
         except Exception:
             continue
-    return "0.0.0"
+    return "0.1.0"
 
 
 def write_update_cache_version() -> None:
