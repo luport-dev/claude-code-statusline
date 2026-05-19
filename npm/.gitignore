@@ -1,3 +1,6 @@
 payload/
 *.tgz
 node_modules/
+# synced from repo root by bin/sync-payload.js
+README.md
+LICENSE

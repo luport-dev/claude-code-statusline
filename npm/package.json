@@ -1,5 +1,5 @@
 {
-  "name": "claude-code-statusline",
+  "name": "@luport-dev/claude-code-statusline",
   "version": "0.1.0",
   "description": "Two-line colored status line for Claude Code CLI",
   "bin": {
@@ -7,7 +7,9 @@
   },
   "files": [
     "bin/",
-    "payload/"
+    "payload/",
+    "README.md",
+    "LICENSE"
   ],
   "scripts": {
     "prepack": "node bin/sync-payload.js"
@@ -23,6 +25,13 @@
   "repository": {
     "type": "git",
     "url": "https://github.com/luport-dev/Claude-Code-CLI-StatusLine.git"
+  },
+  "bugs": {
+    "url": "https://github.com/luport-dev/Claude-Code-CLI-StatusLine/issues"
+  },
+  "homepage": "https://github.com/luport-dev/Claude-Code-CLI-StatusLine#readme",
+  "publishConfig": {
+    "access": "public"
   },
   "engines": {
     "node": ">=14"

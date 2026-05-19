@@ -184,15 +184,13 @@ setup\win\setup.cmd       # Windows (CMD)
 
 All three are thin wrappers that just call `python3 setup/settings.py` (or `python` on Windows).
 
-## Option B — via npx *(not published yet)*
-
-> ⚠️ **Not yet available on the npm registry.** The npm wrapper exists in this repo (`npm/`) but `claude-code-statusline` has not been published yet. Until the first npm release this command will fail — use **Option A** instead.
+## Option B — via npx
 
 ```bash
-npx -y claude-code-statusline
+npx -y @luport-dev/claude-code-statusline
 ```
 
-Once published, this will fetch the npm wrapper, locate `python3` (or `python` / `py` on Windows), and start the TUI. From there pick **Install** from the main menu, configure as desired, then **q** to save and quit. Restart Claude Code afterwards.
+This fetches the npm wrapper, locates `python3` (or `python` / `py` on Windows), and starts the TUI. From there pick **Install** from the main menu, configure as desired, then **q** to save and quit. Restart Claude Code afterwards.
 
 > Requires Node.js (any version ≥ 14) and Python 3. The `-y` flag auto-confirms npx's download prompt so the call never blocks.
 

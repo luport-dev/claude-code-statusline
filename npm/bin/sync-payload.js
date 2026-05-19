@@ -9,16 +9,22 @@ const fs = require("fs");
 const path = require("path");
 
 const ROOT = path.join(__dirname, "..", "..");
-const PAYLOAD = path.join(__dirname, "..", "payload");
+const NPM_DIR = path.join(__dirname, "..");
+const PAYLOAD = path.join(NPM_DIR, "payload");
 
-const FILES = [
+const PAYLOAD_FILES = [
   ["setup/settings.py", "settings.py"],
   ["scripts/statusline.py", "statusline.py"],
 ];
 
+const ROOT_FILES = [
+  ["README.md", "README.md"],
+  ["LICENSE", "LICENSE"],
+];
+
 fs.mkdirSync(PAYLOAD, { recursive: true });
 
-for (const [src, dest] of FILES) {
+for (const [src, dest] of PAYLOAD_FILES) {
   const srcAbs = path.join(ROOT, src);
   const destAbs = path.join(PAYLOAD, dest);
   if (!fs.existsSync(srcAbs)) {
@@ -27,4 +33,15 @@ for (const [src, dest] of FILES) {
   }
   fs.copyFileSync(srcAbs, destAbs);
   console.log("copied: " + src + " -> payload/" + dest);
+}
+
+for (const [src, dest] of ROOT_FILES) {
+  const srcAbs = path.join(ROOT, src);
+  const destAbs = path.join(NPM_DIR, dest);
+  if (!fs.existsSync(srcAbs)) {
+    console.error("missing: " + srcAbs);
+    process.exit(1);
+  }
+  fs.copyFileSync(srcAbs, destAbs);
+  console.log("copied: " + src + " -> " + dest);
 }
