@@ -465,7 +465,7 @@ def main_menu(stdscr: "curses.window", config: dict, original: dict) -> tuple[di
             tag = str(cache["latest_version"])
             if not tag.startswith(("v", "V")):
                 tag = f"v{tag}"
-            hint_text = f"⬆  Update available: {tag}"
+            hint_text = f"🔔  Update available: {tag}"
 
         draw_divider(stdscr, h - 5)
         if hint_text:
