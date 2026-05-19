@@ -7,6 +7,7 @@ to stdout. Behaviour mirrors scripts/linux/statusline.sh (jq) line-for-line.
 from __future__ import annotations
 
 import json
+import math
 import os
 import shutil
 import subprocess
@@ -63,8 +64,8 @@ def to_float(value, default: float = 0.0) -> float:
 
 
 def fmt_pct(value: float) -> str:
-    """Format percentage with one decimal place."""
-    return f"{value:.1f}%"
+    """Format percentage as whole number, rounded up to match /usage."""
+    return f"{math.ceil(value)}%"
 
 
 def fmt_tokens(n: int) -> str:
