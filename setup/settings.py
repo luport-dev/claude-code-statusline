@@ -1279,7 +1279,12 @@ if __name__ == "__main__":
     except ImportError:
         print("ERROR: curses not available. On Windows: pip install windows-curses")
         raise SystemExit(1)
-    write_update_cache_version()
+    # Only write current_version when running from the npm payload (a package.json
+    # sits next to settings.py). In repo/dev mode we skip this to avoid polluting
+    # the cache with the not-yet-published repo version.
+    here = Path(__file__).resolve().parent
+    if (here / "package.json").exists():
+        write_update_cache_version()
     update_thread = maybe_trigger_update_check()
     curses.wrapper(run)
     if update_thread is not None:
