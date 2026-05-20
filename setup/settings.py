@@ -57,12 +57,12 @@ UPDATE_CHOICES = ("never", "daily", "weekly", "monthly")
 
 
 def _find_install_src() -> Path:
-    """Findet statusline.py: erst im Repo (../scripts/), dann neben settings.py (npm payload)."""
+    """Findet statusline.py: erst neben settings.py (npm payload), dann im Repo (../scripts/)."""
     here = Path(__file__).resolve().parent
-    repo_src = here.parent / "scripts" / "statusline.py"
-    if repo_src.exists():
-        return repo_src
-    return here / "statusline.py"
+    payload_src = here / "statusline.py"
+    if payload_src.exists():
+        return payload_src
+    return here.parent / "scripts" / "statusline.py"
 
 
 INSTALL_SRC = _find_install_src()
@@ -1288,7 +1288,9 @@ if __name__ == "__main__":
         write_update_cache_version()
         # Auto-refresh statusline.py if already installed so npx acts as an update.
         if is_installed():
-            refresh_install()
+            ok = refresh_install()
+            if ok:
+                print("statusline.py updated.")
     update_thread = maybe_trigger_update_check()
     curses.wrapper(run)
     if update_thread is not None:
