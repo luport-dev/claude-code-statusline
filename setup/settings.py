@@ -655,6 +655,13 @@ def main_menu(stdscr: "curses.window", config: dict, original: dict) -> tuple[di
         safe_addstr(stdscr, toggle_y, 3, pointer, _attr(CP_ACCENT, bold=True))
         safe_addstr(stdscr, toggle_y, 6, glyph(toggle_emo) + "  " + toggle_label, toggle_attr)
 
+        # Current version — always shown, right-aligned.
+        cur = str(cache.get("current_version") or _read_package_version())
+        if not cur.startswith(("v", "V")):
+            cur = f"v{cur}"
+        safe_addstr(stdscr, h - 6, max(2, w - 2 - len(cur)), cur, _attr(CP_BORDER))
+
+        # Update banner — centered, only when an update is available.
         if update_tag:
             banner = glyph(f"🔔  Update available: {update_tag}")
             safe_addstr(stdscr, h - 6, max(2, (w - len(banner)) // 2), banner, _attr(CP_WARN, bold=True))
