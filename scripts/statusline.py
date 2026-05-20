@@ -237,7 +237,7 @@ _CONFIG_PATH = Path.home() / ".claude" / "statusline_config.json"
 _STATE_PATH  = Path.home() / ".claude" / "statusline_state.json"
 _UPDATE_PATH = Path.home() / ".claude" / "statusline_update.json"
 
-_GITHUB_REPO = "luport-dev/claude-code-statusline"
+_NPM_PACKAGE = "@luport-dev/claude-code-statusline"
 _UPDATE_INTERVALS_SEC = {
     "daily":   24 * 3600,
     "weekly":  7 * 24 * 3600,
@@ -413,32 +413,19 @@ def save_update_cache(data: dict) -> None:
         pass
 
 
-def _gh_get(url: str):
+def _fetch_latest_release() -> str | None:
+    """Return the latest version from the npm registry."""
     import urllib.request
-    import urllib.error
-    req = urllib.request.Request(url, headers={
-        "Accept": "application/vnd.github+json",
-        "User-Agent": "claude-code-statusline",
-    })
+    url = f"https://registry.npmjs.org/{_NPM_PACKAGE}/latest"
+    req = urllib.request.Request(url, headers={"User-Agent": "claude-code-statusline"})
     try:
         with urllib.request.urlopen(req, timeout=3) as resp:
-            return json.load(resp)
-    except (urllib.error.URLError, urllib.error.HTTPError, OSError, ValueError, TimeoutError):
-        return None
-
-
-def _fetch_latest_release() -> str | None:
-    """Return the latest release tag from GitHub. Falls back to newest tag."""
-    payload = _gh_get(f"https://api.github.com/repos/{_GITHUB_REPO}/releases/latest")
-    if isinstance(payload, dict):
-        tag = payload.get("tag_name") or payload.get("name")
-        if tag:
-            return str(tag)
-    tags = _gh_get(f"https://api.github.com/repos/{_GITHUB_REPO}/tags?per_page=1")
-    if isinstance(tags, list) and tags:
-        name = tags[0].get("name") if isinstance(tags[0], dict) else None
-        if name:
-            return str(name)
+            data = json.load(resp)
+        version = data.get("version")
+        if version:
+            return str(version)
+    except Exception:
+        pass
     return None
 
 

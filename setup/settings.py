@@ -103,8 +103,8 @@ def _read_package_version() -> str:
     """Locate package.json shipped with the repo/payload and return its version."""
     here = Path(__file__).resolve().parent
     for candidate in (
-        here.parent / "npm" / "package.json",
-        here / "package.json",
+        here / "package.json",           # npm payload (neben settings.py)
+        here.parent / "npm" / "package.json",  # Repo-Entwicklungsumgebung
         here.parent / "package.json",
     ):
         try:
@@ -116,30 +116,20 @@ def _read_package_version() -> str:
     return "0.1.1"
 
 
-_GITHUB_REPO = "luport-dev/claude-code-statusline"
+_NPM_PACKAGE = "@luport-dev/claude-code-statusline"
 _UPDATE_INTERVALS_SEC = {"daily": 86400, "weekly": 604800, "monthly": 2592000}
 
 
 def _fetch_latest_release() -> str | None:
     import urllib.request
-    url = f"https://api.github.com/repos/{_GITHUB_REPO}/releases/latest"
-    req = urllib.request.Request(url, headers={
-        "Accept": "application/vnd.github+json",
-        "User-Agent": "claude-code-statusline-settings",
-    })
+    url = f"https://registry.npmjs.org/{_NPM_PACKAGE}/latest"
+    req = urllib.request.Request(url, headers={"User-Agent": "claude-code-statusline-settings"})
     try:
         with urllib.request.urlopen(req, timeout=5) as resp:
             data = json.load(resp)
-        tag = data.get("tag_name") or data.get("name")
-        if tag:
-            return str(tag)
-        # Fallback: newest tag
-        tags_url = f"https://api.github.com/repos/{_GITHUB_REPO}/tags?per_page=1"
-        req2 = urllib.request.Request(tags_url, headers=req.headers)
-        with urllib.request.urlopen(req2, timeout=5) as resp2:
-            tags = json.load(resp2)
-        if isinstance(tags, list) and tags:
-            return str(tags[0].get("name", ""))
+        version = data.get("version")
+        if version:
+            return str(version)
     except Exception:
         pass
     return None
@@ -563,17 +553,51 @@ def show_flash(stdscr: "curses.window", msg: str, attr: int) -> None:
     stdscr.getch()
 
 
+def do_update(stdscr: "curses.window") -> None:
+    """Show the command the user needs to run to update."""
+    stdscr.clear()
+    h, w = stdscr.getmaxyx()
+    draw_box(stdscr, "How to update")
+    cmd = "npx -y @luport-dev/claude-code-statusline"
+    lines = [
+        "Close this TUI and run the following command:",
+        "",
+        cmd,
+        "",
+        "This will download the latest version and open",
+        "the settings TUI again to complete the update.",
+    ]
+    y0 = max(2, h // 2 - len(lines) // 2)
+    for i, line in enumerate(lines):
+        attr = _attr(CP_ACCENT, bold=True) if line == cmd else _attr(CP_DIM)
+        safe_addstr(stdscr, y0 + i, max(2, (w - len(line)) // 2), line, attr)
+    hint = "Press any key to go back"
+    safe_addstr(stdscr, h - 3, max(2, (w - len(hint)) // 2), hint, _attr(CP_DIM))
+    stdscr.refresh()
+    stdscr.getch()
+
+
 def main_menu(stdscr: "curses.window", config: dict, original: dict) -> tuple[dict, bool]:
     """Returns (config, save). save reflects user's choice on exit."""
     curses.curs_set(0)
     stdscr.keypad(True)
     selected = 0
-    # Gesamtanzahl Einträge = MENU_ITEMS + 1 Toggle-Eintrag
-    total = len(MENU_ITEMS) + 1
-    TOGGLE_IDX = len(MENU_ITEMS)
 
     while True:
         installed = is_installed()
+        cache = load_update_cache()
+        update_tag = ""
+        if cache.get("update_available") and cache.get("latest_version"):
+            tag = str(cache["latest_version"])
+            if not tag.startswith(("v", "V")):
+                tag = f"v{tag}"
+            update_tag = tag
+
+        # Build dynamic index list
+        UPDATE_IDX = len(MENU_ITEMS) if update_tag else -1
+        TOGGLE_IDX = len(MENU_ITEMS) + (1 if update_tag else 0)
+        total = TOGGLE_IDX + 1
+
         stdscr.clear()
         h, w = stdscr.getmaxyx()
         draw_box(stdscr, "Claude Code Status Line — Settings")
@@ -585,6 +609,15 @@ def main_menu(stdscr: "curses.window", config: dict, original: dict) -> tuple[di
             label_attr = _attr(CP_ACCENT, bold=True) if i == selected else _attr(CP_DIM)
             safe_addstr(stdscr, y, 6, glyph(emo) + "  " + item, label_attr)
 
+        # Update-Eintrag (nur wenn Update verfügbar)
+        if update_tag:
+            update_y = 3 + UPDATE_IDX * 2
+            update_label = f"Update to {update_tag}"
+            update_attr = _attr(CP_WARN, bold=True) if selected == UPDATE_IDX else _attr(CP_BORDER)
+            pointer = ">" if selected == UPDATE_IDX else " "
+            safe_addstr(stdscr, update_y, 3, pointer, _attr(CP_ACCENT, bold=True))
+            safe_addstr(stdscr, update_y, 6, glyph("🔔") + "  " + update_label, update_attr)
+
         # Toggle-Eintrag
         toggle_y = 3 + TOGGLE_IDX * 2
         toggle_label = "Uninstall" if installed else "Install"
@@ -594,16 +627,9 @@ def main_menu(stdscr: "curses.window", config: dict, original: dict) -> tuple[di
         safe_addstr(stdscr, toggle_y, 3, pointer, _attr(CP_ACCENT, bold=True))
         safe_addstr(stdscr, toggle_y, 6, glyph(toggle_emo) + "  " + toggle_label, toggle_attr)
 
-        cache = load_update_cache()
-        hint_text = ""
-        if cache.get("update_available") and cache.get("latest_version"):
-            tag = str(cache["latest_version"])
-            if not tag.startswith(("v", "V")):
-                tag = f"v{tag}"
-            hint_text = glyph(f"🔔  Update available: {tag}")
-
-        if hint_text:
-            safe_addstr(stdscr, h - 6, max(2, (w - len(hint_text)) // 2), hint_text, _attr(CP_WARN, bold=True))
+        if update_tag:
+            banner = glyph(f"🔔  Update available: {update_tag}")
+            safe_addstr(stdscr, h - 6, max(2, (w - len(banner)) // 2), banner, _attr(CP_WARN, bold=True))
 
         draw_divider(stdscr, h - 5)
         path_text = f"{CONFIG_PATH}"
@@ -658,6 +684,8 @@ def main_menu(stdscr: "curses.window", config: dict, original: dict) -> tuple[di
                 config = menu_bar_style(stdscr, config)
             elif selected == 5:
                 config = menu_updates(stdscr, config)
+            elif update_tag and selected == UPDATE_IDX:
+                do_update(stdscr)
             elif selected == TOGGLE_IDX:
                 if installed:
                     result = do_uninstall()
@@ -1251,6 +1279,7 @@ if __name__ == "__main__":
     except ImportError:
         print("ERROR: curses not available. On Windows: pip install windows-curses")
         raise SystemExit(1)
+    write_update_cache_version()
     update_thread = maybe_trigger_update_check()
     curses.wrapper(run)
     if update_thread is not None:
