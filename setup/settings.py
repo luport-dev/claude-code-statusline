@@ -1283,8 +1283,12 @@ if __name__ == "__main__":
     # sits next to settings.py). In repo/dev mode we skip this to avoid polluting
     # the cache with the not-yet-published repo version.
     here = Path(__file__).resolve().parent
-    if (here / "package.json").exists():
+    is_payload = (here / "package.json").exists()
+    if is_payload:
         write_update_cache_version()
+        # Auto-refresh statusline.py if already installed so npx acts as an update.
+        if is_installed():
+            refresh_install()
     update_thread = maybe_trigger_update_check()
     curses.wrapper(run)
     if update_thread is not None:
