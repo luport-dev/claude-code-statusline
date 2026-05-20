@@ -1,5 +1,8 @@
 # Claude Code CLI Status Line
 
+![Status line preview Haiku](screenshots/samples.png)
+> *Example values for illustrating the color stages.*
+
 ## What is it?
 
 A two-line, colored status line for the **[Claude Code CLI](https://claude.ai/code)** that shows all relevant session data at a glance:
@@ -27,21 +30,9 @@ A built-in update checker also pings GitHub on a configurable interval (off / da
 
 - Claude Code passes a JSON object to the status line via stdin. 
 - The script reads it, determines the git branch via `git branch --show-current` in the current working directory, and returns the formatted, colored output
+- Colors automatically shift green → yellow → red depending on usage.  
+- The label next to a bar uses the colour of the bar's most recent segment, so the active threshold stays visible at a glance.
 - Implemented in Python 3 (standard library only) and works on Linux, macOS, and Windows.
-
-
-## Examples
-
-![Status line preview Haiku](screenshots/samples.png)
-
-> *Example values for illustrating the color stages.*
-
-- **Line 1**: Model (colored by type), effort, thinking status, context usage (`ctx`), token count (`tkn`), rate limits (5h / 7d)<br>
-- **Line 2**: Working directory, git branch, active worktree (if applicable), update check hints
-
-Colors automatically shift green → yellow → red depending on usage.  
-
-The label next to a bar uses the colour of the bar's most recent segment, so the active threshold stays visible at a glance.
 
 
 ## Color Scheme
