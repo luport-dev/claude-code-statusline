@@ -116,6 +116,91 @@ def _read_package_version() -> str:
     return "0.1.1"
 
 
+_GITHUB_REPO = "luport-dev/claude-code-statusline"
+_UPDATE_INTERVALS_SEC = {"daily": 86400, "weekly": 604800, "monthly": 2592000}
+
+
+def _fetch_latest_release() -> str | None:
+    import urllib.request
+    url = f"https://api.github.com/repos/{_GITHUB_REPO}/releases/latest"
+    req = urllib.request.Request(url, headers={
+        "Accept": "application/vnd.github+json",
+        "User-Agent": "claude-code-statusline-settings",
+    })
+    try:
+        with urllib.request.urlopen(req, timeout=5) as resp:
+            data = json.load(resp)
+        tag = data.get("tag_name") or data.get("name")
+        if tag:
+            return str(tag)
+        # Fallback: newest tag
+        tags_url = f"https://api.github.com/repos/{_GITHUB_REPO}/tags?per_page=1"
+        req2 = urllib.request.Request(tags_url, headers=req.headers)
+        with urllib.request.urlopen(req2, timeout=5) as resp2:
+            tags = json.load(resp2)
+        if isinstance(tags, list) and tags:
+            return str(tags[0].get("name", ""))
+    except Exception:
+        pass
+    return None
+
+
+def _parse_version(v: str) -> tuple:
+    import re
+    return tuple(int(x) for x in re.findall(r"\d+", str(v)))
+
+
+def _update_check_worker() -> None:
+    data: dict = {}
+    if UPDATE_CACHE.exists():
+        try:
+            with UPDATE_CACHE.open(encoding="utf-8") as f:
+                data = json.load(f) or {}
+        except Exception:
+            data = {}
+    current = str(data.get("current_version") or _read_package_version())
+    latest = _fetch_latest_release()
+    if latest is None:
+        return
+    import datetime
+    data.update({
+        "last_checked":     datetime.datetime.now(datetime.timezone.utc).replace(microsecond=0).isoformat(),
+        "latest_version":   latest,
+        "current_version":  current,
+        "update_available": _parse_version(latest) > _parse_version(current),
+    })
+    try:
+        UPDATE_CACHE.parent.mkdir(parents=True, exist_ok=True)
+        with UPDATE_CACHE.open("w", encoding="utf-8") as f:
+            json.dump(data, f, indent=2)
+            f.write("\n")
+    except OSError:
+        pass
+
+
+def maybe_trigger_update_check() -> None:
+    """Start a background thread to refresh the update cache if the interval has elapsed."""
+    try:
+        data: dict = {}
+        if UPDATE_CACHE.exists():
+            with UPDATE_CACHE.open(encoding="utf-8") as f:
+                data = json.load(f) or {}
+        last = data.get("last_checked")
+        if last:
+            import datetime
+            last_dt = datetime.datetime.fromisoformat(str(last).replace("Z", "+00:00"))
+            if last_dt.tzinfo is None:
+                last_dt = last_dt.replace(tzinfo=datetime.timezone.utc)
+            interval = _UPDATE_INTERVALS_SEC.get("weekly", 604800)
+            if (datetime.datetime.now(datetime.timezone.utc) - last_dt).total_seconds() < interval:
+                return
+    except Exception:
+        pass
+    import threading
+    t = threading.Thread(target=_update_check_worker, daemon=True)
+    t.start()
+
+
 def write_update_cache_version() -> None:
     """Seed/refresh the update cache's current_version on install."""
     try:
@@ -1160,6 +1245,7 @@ if __name__ == "__main__":
     except ImportError:
         print("ERROR: curses not available. On Windows: pip install windows-curses")
         raise SystemExit(1)
+    maybe_trigger_update_check()
     curses.wrapper(run)
     if _save_result:
         refreshed = refresh_install()
