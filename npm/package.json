@@ -1,6 +1,6 @@
 {
   "name": "@luport-dev/claude-code-statusline",
-  "version": "0.1.6",
+  "version": "0.1.7",
   "description": "Two-line colored status line for Claude Code CLI",
   "bin": {
     "claude-code-statusline": "bin/cli.js"
