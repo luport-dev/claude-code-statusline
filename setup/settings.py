@@ -433,8 +433,9 @@ def draw_box(win, title: str) -> None:
 
 
 def draw_divider(win, y: int) -> None:
+    """Horizontal divider that fuses into the outer border with ├ ┤ T-pieces."""
     h, w = win.getmaxyx()
-    safe_addstr(win, y, 2, "─" * max(0, w - 4), _attr(CP_BORDER))
+    safe_addstr(win, y, 0, "├" + "─" * max(0, w - 2) + "┤", _attr(CP_BORDER))
 
 
 def draw_hint_pills(win, y: int, pills: list[tuple[str, str]]) -> None:
@@ -630,6 +631,26 @@ def main_menu(stdscr: "curses.window", config: dict, original: dict) -> tuple[di
         h, w = stdscr.getmaxyx()
         draw_box(stdscr, "Claude Code Status Line — Settings")
 
+        # Current version — top-right, framed into a mini-box that shares the
+        # outer box's right wall. ┬ taps off the top border, ╰/┤ close it below.
+        cur = str(cache.get("current_version") or _read_package_version())
+        if not cur.startswith(("v", "V")):
+            cur = f"v{cur}"
+        inner = f" {cur} "
+        box_w = len(inner)                 # width of the version text cell
+        left_x = w - 2 - box_w             # x of the mini-box's left edge
+        if left_x >= 2:
+            border = _attr(CP_BORDER)
+            # top: ┬ taps downward from the outer top border; ─ fills the span.
+            # Position w-1 keeps the outer box's ╮ corner untouched.
+            safe_addstr(stdscr, 0, left_x, "┬" + "─" * box_w, border)
+            # version cell — left wall ┤ of the mini-box, right wall is outer │.
+            safe_addstr(stdscr, 1, left_x, "│", border)
+            safe_addstr(stdscr, 1, left_x + 1, inner, _attr(CP_DIM))
+            safe_addstr(stdscr, 1, w - 1, "│", border)
+            # bottom: ╰ rounded on the left, ┤ fuses into the outer right wall.
+            safe_addstr(stdscr, 2, left_x, "╰" + "─" * box_w + "┤", border)
+
         for i, (item, emo) in enumerate(MENU_ITEMS):
             y = 3 + i * 2
             pointer = ">" if i == selected else " "
@@ -654,12 +675,6 @@ def main_menu(stdscr: "curses.window", config: dict, original: dict) -> tuple[di
         pointer = ">" if selected == TOGGLE_IDX else " "
         safe_addstr(stdscr, toggle_y, 3, pointer, _attr(CP_ACCENT, bold=True))
         safe_addstr(stdscr, toggle_y, 6, glyph(toggle_emo) + "  " + toggle_label, toggle_attr)
-
-        # Current version — always shown, right-aligned.
-        cur = str(cache.get("current_version") or _read_package_version())
-        if not cur.startswith(("v", "V")):
-            cur = f"v{cur}"
-        safe_addstr(stdscr, h - 6, max(2, w - 2 - len(cur)), cur, _attr(CP_BORDER))
 
         # Update banner — centered, only when an update is available.
         if update_tag:
