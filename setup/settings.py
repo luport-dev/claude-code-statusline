@@ -99,20 +99,42 @@ DEFAULTS: dict = {
 }
 
 
-def _read_package_version() -> str:
-    """Locate package.json shipped with the repo/payload and return its version."""
+def _find_package_json() -> Path | None:
+    """Locate the npm package.json.
+
+    In the published npm layout settings.py lives in ``payload/`` and
+    package.json sits in the package root one level up. In the repo it is in
+    ``npm/package.json``. Returns None if neither is found (manual install).
+    """
     here = Path(__file__).resolve().parent
     for candidate in (
-        here / "package.json",           # npm payload (neben settings.py)
-        here.parent / "npm" / "package.json",  # Repo-Entwicklungsumgebung
-        here.parent / "package.json",
+        here.parent / "package.json",          # npm payload root (payload/../package.json)
+        here / "package.json",                 # next to settings.py (defensive)
+        here.parent / "npm" / "package.json",  # repo development checkout
     ):
+        if candidate.exists():
+            return candidate
+    return None
+
+
+def _is_npm_payload() -> bool:
+    """True when running from an installed npm package (not the repo checkout)."""
+    pkg = _find_package_json()
+    if pkg is None:
+        return False
+    # Repo checkout has the package.json under npm/; payload has it at the root.
+    return pkg.parent.name != "npm"
+
+
+def _read_package_version() -> str:
+    """Return the version from the located package.json, or a safe fallback."""
+    pkg = _find_package_json()
+    if pkg is not None:
         try:
-            if candidate.exists():
-                with candidate.open(encoding="utf-8") as f:
-                    return str(json.load(f).get("version") or "0.1.1")
+            with pkg.open(encoding="utf-8") as f:
+                return str(json.load(f).get("version") or "0.1.1")
         except Exception:
-            continue
+            pass
     return "0.1.1"
 
 
@@ -1279,12 +1301,9 @@ if __name__ == "__main__":
     except ImportError:
         print("ERROR: curses not available. On Windows: pip install windows-curses")
         raise SystemExit(1)
-    # Only write current_version when running from the npm payload (a package.json
-    # sits next to settings.py). In repo/dev mode we skip this to avoid polluting
-    # the cache with the not-yet-published repo version.
-    here = Path(__file__).resolve().parent
-    is_payload = (here / "package.json").exists()
-    if is_payload:
+    # Only write current_version when running from the npm payload. In repo/dev
+    # mode we skip it to avoid polluting the cache with the unpublished version.
+    if _is_npm_payload():
         write_update_cache_version()
         # Auto-refresh statusline.py if already installed so npx acts as an update.
         if is_installed():
