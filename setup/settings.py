@@ -8,10 +8,44 @@ from __future__ import annotations
 
 import curses
 import json
+import os
 import platform
 import shutil
+import sys
 import time
 from pathlib import Path
+
+
+def _force_utf8() -> None:
+    """Make sure the console can render the TUI's box-drawing chars and emojis.
+
+    On Windows, Python often starts with the legacy cp1252 code page, which
+    cannot encode emojis at all and renders them as tofu (◇◇). We flip the
+    console to UTF-8 (code page 65001) and reconfigure the std streams so
+    curses receives correct bytes.
+    """
+    if platform.system() == "Windows":
+        try:
+            # 65001 = UTF-8. Affects how the console interprets our output.
+            os.system("chcp 65001 > nul")
+        except Exception:
+            pass
+        try:
+            import ctypes
+
+            # SetConsoleOutputCP / SetConsoleCP — belt-and-suspenders next to chcp.
+            ctypes.windll.kernel32.SetConsoleOutputCP(65001)
+            ctypes.windll.kernel32.SetConsoleCP(65001)
+        except Exception:
+            pass
+    for stream in (sys.stdout, sys.stderr, sys.stdin):
+        try:
+            stream.reconfigure(encoding="utf-8")  # type: ignore[attr-defined]
+        except Exception:
+            pass
+
+
+_force_utf8()
 
 CONFIG_PATH   = Path.home() / ".claude" / "statusline_config.json"
 STATE_PATH    = Path.home() / ".claude" / "statusline_state.json"
@@ -207,7 +241,8 @@ MENU_ITEMS = [
     ("Git visibility",           "🌳"),
     ("Decoration (symbols/label)", "🎨"),
     ("Bar style",                "📊"),
-    ("Update checks",            "♻️"),
+    # No U+FE0F variation selector — bare ♻ renders far more reliably in curses.
+    ("Update checks",            "♻"),
 ]
 
 
@@ -317,6 +352,15 @@ def emoji_safe(emoji: str) -> str:
     """Ensure narrow emojis have a trailing space so columns don't collide."""
     narrow = set()
     return emoji if emoji.endswith(" ") or emoji in narrow else emoji + " "
+
+
+def glyph(s: str) -> str:
+    """Strip the U+FE0F variation selector before drawing.
+
+    curses miscomputes the column width of emoji + U+FE0F sequences, which
+    causes tofu (◇) or layout drift. The bare codepoint renders reliably.
+    """
+    return s.replace("️", "")
 
 
 def diff_config(original: dict, current: dict) -> list[str]:
@@ -445,9 +489,8 @@ def main_menu(stdscr: "curses.window", config: dict, original: dict) -> tuple[di
             y = 3 + i * 2
             pointer = ">" if i == selected else " "
             safe_addstr(stdscr, y, 3, pointer, _attr(CP_ACCENT, bold=True))
-            safe_addstr(stdscr, y, 6, emo)
-            label_attr = _attr(CP_ACCENT, bold=True) if i == selected else 0
-            safe_addstr(stdscr, y, 11, item, label_attr)
+            label_attr = _attr(CP_ACCENT, bold=True) if i == selected else _attr(CP_DIM)
+            safe_addstr(stdscr, y, 6, glyph(emo) + "  " + item, label_attr)
 
         # Toggle-Eintrag
         toggle_y = 3 + TOGGLE_IDX * 2
@@ -456,8 +499,7 @@ def main_menu(stdscr: "curses.window", config: dict, original: dict) -> tuple[di
         toggle_attr  = _attr(CP_DANGER if installed else CP_OK, bold=(selected == TOGGLE_IDX))
         pointer = ">" if selected == TOGGLE_IDX else " "
         safe_addstr(stdscr, toggle_y, 3, pointer, _attr(CP_ACCENT, bold=True))
-        safe_addstr(stdscr, toggle_y, 6, toggle_emo, toggle_attr)
-        safe_addstr(stdscr, toggle_y, 11, toggle_label, toggle_attr)
+        safe_addstr(stdscr, toggle_y, 6, glyph(toggle_emo) + "  " + toggle_label, toggle_attr)
 
         cache = load_update_cache()
         hint_text = ""
@@ -465,7 +507,7 @@ def main_menu(stdscr: "curses.window", config: dict, original: dict) -> tuple[di
             tag = str(cache["latest_version"])
             if not tag.startswith(("v", "V")):
                 tag = f"v{tag}"
-            hint_text = f"🔔  Update available: {tag}"
+            hint_text = glyph(f"🔔  Update available: {tag}")
 
         draw_divider(stdscr, h - 5)
         if hint_text:
@@ -600,8 +642,7 @@ def menu_thresholds(stdscr: "curses.window", config: dict) -> dict:
         for i, (key, lbl, emo) in enumerate(rows):
             y = y_base + i
             row_active = (i == row)
-            safe_addstr(stdscr, y, 4, emo + " ")
-            safe_addstr(stdscr, y, 9, lbl, _attr(CP_ACCENT, bold=True) if row_active else 0)
+            safe_addstr(stdscr, y, 4, glyph(emo) + "  " + lbl, _attr(CP_ACCENT, bold=True) if row_active else _attr(CP_DIM))
             warn_x = 18
             crit_x = 36
             for j, field in enumerate(fields):
@@ -611,15 +652,15 @@ def menu_thresholds(stdscr: "curses.window", config: dict) -> dict:
                 field_color = CP_WARN if field == "warn" else CP_DANGER
                 field_emo = "🟡" if field == "warn" else "🔴"
                 flabel = field_labels[field]
-                safe_addstr(stdscr, y, x, field_emo + " ")
-                safe_addstr(stdscr, y, x + 3, f"{flabel}:", _attr(field_color, bold=True))
                 bracket = ">" if cell_active else " "
-                safe_addstr(stdscr, y, x + 3 + len(flabel) + 2, bracket, _attr(CP_ACCENT, bold=True))
                 box_attr = _attr(CP_VALUE, bold=True) if cell_active else _attr(CP_VALUE)
                 shown = f"{val:>3}%"
                 if cell_active and digit_buffer:
                     shown = f"{int(digit_buffer):>3}%"
-                safe_addstr(stdscr, y, x + 3 + len(flabel) + 3, shown, box_attr)
+                # Draw emoji + label as one string to avoid curses width miscalculation.
+                prefix = glyph(field_emo) + " " + flabel + ": " + bracket + " "
+                safe_addstr(stdscr, y, x, prefix, _attr(field_color, bold=True))
+                safe_addstr(stdscr, y, x + len(prefix), shown, box_attr)
 
         draw_hint_pills(stdscr, h - 2, [
             ("↑↓",    "row"),
@@ -757,9 +798,8 @@ def menu_metrics(stdscr: "curses.window", config: dict) -> dict:
             row_active = (i == row)
             pointer = ">" if row_active else " "
             safe_addstr(stdscr, y, 2, pointer, _attr(CP_ACCENT, bold=True))
-            safe_addstr(stdscr, y, 4, metric_glyph.get(key, "?") + " ")
-            lbl_attr = _attr(CP_ACCENT, bold=True) if row_active else 0
-            safe_addstr(stdscr, y, 9, lbl.strip(), lbl_attr)
+            lbl_attr = _attr(CP_ACCENT, bold=True) if row_active else _attr(CP_DIM)
+            safe_addstr(stdscr, y, 4, glyph(metric_glyph.get(key, "?")) + "  " + lbl.strip(), lbl_attr)
             for j, choice in enumerate(DISPLAY_CHOICES):
                 selected_mark = state[key] == choice
                 if selected_mark:
@@ -866,10 +906,9 @@ def menu_visibility(
             check_attr = _attr(CP_OK, bold=True) if state[key] else _attr(CP_DIM)
             safe_addstr(stdscr, y, 6, check, check_attr)
             if emo:
-                safe_addstr(stdscr, y, 10, emo + " ")
-                safe_addstr(stdscr, y, 13, lbl, _attr(CP_ACCENT, bold=True) if row_active else 0)
+                safe_addstr(stdscr, y, 10, glyph(emo) + "  " + lbl, _attr(CP_ACCENT, bold=True) if row_active else _attr(CP_DIM))
             else:
-                lbl_attr = _attr(CP_ACCENT, bold=True) if row_active else 0
+                lbl_attr = _attr(CP_ACCENT, bold=True) if row_active else _attr(CP_DIM)
                 safe_addstr(stdscr, y, 10, lbl, lbl_attr)
 
         draw_hint_pills(stdscr, h - 2, [
@@ -924,8 +963,8 @@ def menu_bar_decoration(stdscr: "curses.window", config: dict) -> dict:
             radio = "(*)" if row_active else "( )"
             radio_attr = _attr(CP_OK, bold=True) if row_active else _attr(CP_DIM)
             safe_addstr(stdscr, y, 6, radio, radio_attr)
-            lbl_attr = _attr(CP_ACCENT, bold=True) if row_active else 0
-            safe_addstr(stdscr, y, 10, lbl, lbl_attr)
+            lbl_attr = _attr(CP_ACCENT, bold=True) if row_active else _attr(CP_DIM)
+            safe_addstr(stdscr, y, 10, glyph(lbl), lbl_attr)
 
         draw_hint_pills(stdscr, h - 2, [
             ("↑↓",      "choose"),
@@ -979,7 +1018,7 @@ def menu_bar_style(stdscr: "curses.window", config: dict) -> dict:
             radio = "(*)" if row_active else "( )"
             radio_attr = _attr(CP_OK, bold=True) if row_active else _attr(CP_DIM)
             safe_addstr(stdscr, y, 6, radio, radio_attr)
-            lbl_attr = _attr(CP_ACCENT, bold=True) if row_active else 0
+            lbl_attr = _attr(CP_ACCENT, bold=True) if row_active else _attr(CP_DIM)
             safe_addstr(stdscr, y, 10, lbl, lbl_attr)
 
         draw_hint_pills(stdscr, h - 2, [
@@ -1041,7 +1080,7 @@ def menu_updates(stdscr: "curses.window", config: dict) -> dict:
             radio = "(*)" if row_active else "( )"
             radio_attr = _attr(CP_OK, bold=True) if row_active else _attr(CP_DIM)
             safe_addstr(stdscr, y, 6, radio, radio_attr)
-            lbl_attr = _attr(CP_ACCENT, bold=True) if row_active else 0
+            lbl_attr = _attr(CP_ACCENT, bold=True) if row_active else _attr(CP_DIM)
             safe_addstr(stdscr, y, 10, lbl, lbl_attr)
 
         draw_hint_pills(stdscr, h - 2, [

@@ -13,15 +13,21 @@ A two-line, colored status line for the **[Claude Code CLI](https://claude.ai/co
 - the active git branch
 - the active worktree (if applicable)
 
-Each metric can be shown as text, a coloured bar, both, or hidden. Colors automatically shift from green → yellow → red as configured thresholds are crossed, making critical states immediately visible without interrupting Claude's output.
+Each metric can be shown as text, a coloured bar, both, or hidden.  
+Colors automatically shift from green → yellow → red as configured thresholds are crossed, making critical states immediately visible without interrupting Claude's output.
 
-Every segment can be prefixed with either a compact emoji (🤖 💪 🧠 📦 🎫 🕔 📆 / 📁 🌿 🌳) or a word label, and bar glyphs are switchable between four styles — all configurable via an interactive TUI.
+Every segment can be prefixed with either:
+- a compact emoji => `🤖 | 💪 | 🧠 | 📦 | 🎫 | ...`
+- a word label    => `model | effort | thinking | ctx | ...`
+- both => `🤖 model | 💪 effort | 🧠 thinking | ...`
 
 A built-in update checker also pings GitHub on a configurable interval (off / daily / weekly / monthly) and shows a small 🔔 hint in the status line when a new release is available.
 
 ## How it Works
 
-Claude Code passes a JSON object to the status line via stdin. The script reads it, determines the git branch via `git branch --show-current` in the current working directory, and returns the formatted, colored output — implemented in Python 3 (standard library only) and works on Linux, macOS, and Windows.
+- Claude Code passes a JSON object to the status line via stdin. 
+- The script reads it, determines the git branch via `git branch --show-current` in the current working directory, and returns the formatted, colored output
+- Implemented in Python 3 (standard library only) and works on Linux, macOS, and Windows.
 
 
 ## Examples
@@ -30,10 +36,12 @@ Claude Code passes a JSON object to the status line via stdin. The script reads 
 
 > *Example values for illustrating the color stages.*
 
-**Line 1** — Model (colored by type), effort, thinking status, context usage (`ctx`), token count (`tkn`), rate limits (5h / 7d)<br>
-**Line 2** — Working directory, git branch, active worktree (in bronze tones, truncated to fit terminal width with dynamic, shared-space allocation — short segments release unused characters to long ones)
+- **Line 1**: Model (colored by type), effort, thinking status, context usage (`ctx`), token count (`tkn`), rate limits (5h / 7d)<br>
+- **Line 2**: Working directory, git branch, active worktree (if applicable), update check hints
 
-Colors automatically shift green → yellow → red depending on usage. The label next to a bar uses the colour of the bar's most recent segment, so the active threshold stays visible at a glance.
+Colors automatically shift green → yellow → red depending on usage.  
+
+The label next to a bar uses the colour of the bar's most recent segment, so the active threshold stays visible at a glance.
 
 
 ## Color Scheme
@@ -167,7 +175,19 @@ Everything — install, configure, uninstall — runs through a single interacti
 
 There are two ways to launch the TUI:
 
-## Option A — clone the repo *(recommended)*
+## Option A — via npx *(recommended)*
+
+> Requires **Node.js ≥ 14** (`node --version` to check). Install from [nodejs.org](https://nodejs.org) if needed.
+
+```bash
+npx -y @luport-dev/claude-code-statusline
+```
+
+This fetches the npm wrapper, locates `python3` (or `python` / `py` on Windows), and starts the TUI. From there pick **Install** from the main menu, configure as desired, then **q** to save and quit. Restart Claude Code afterwards.
+
+> The `-y` flag auto-confirms npx's download prompt so the call never blocks.
+
+## Option B — clone the repo
 
 ```bash
 git clone https://github.com/luport-dev/claude-code-statusline.git
@@ -185,18 +205,6 @@ setup\win\setup.cmd       # Windows (CMD)
 All three are thin wrappers that just call `python3 setup/settings.py` (or `python` on Windows).
 
 From there pick **Install** from the main menu, configure as desired, then **q** to save and quit. Restart Claude Code afterwards.
-
-## Option B — via npx
-
-> Requires **Node.js ≥ 14** (`node --version` to check). Install from [nodejs.org](https://nodejs.org) if needed.
-
-```bash
-npx -y @luport-dev/claude-code-statusline
-```
-
-This fetches the npm wrapper, locates `python3` (or `python` / `py` on Windows), and starts the TUI. From there pick **Install** from the main menu, configure as desired, then **q** to save and quit. Restart Claude Code afterwards.
-
-> The `-y` flag auto-confirms npx's download prompt so the call never blocks.
 
 ## Manual installation
 
@@ -232,116 +240,37 @@ On Windows use forward slashes and `python` instead of `python3`:
 The same TUI handles install/uninstall and all configuration. Settings are saved to `~/.claude/statusline_config.json`.
 
 **Main menu**
-```
-╭───────────────── Claude Code Status Line — Settings ────────────────────────╮
-│                                                                             │
-│  > [%] Metrics visibility                                                   │
-│    [!] Metrics thresholds                                                   │
-│    [/] Git visibility                                                       │
-│    [#] Decoration (emoji/label)                                             │
-│    [=] Bar style                                                            │
-│    [@] Update checks                                                        │
-│    [ ] Install      ← toggles to "[x] Uninstall" once registered            │
-│                                                                             │
-│             config: ~/.claude/statusline_config.json                        │
-│                                                                             │
-│  ↑↓ navigate  Ent open  q save & quit  esc quit                             │
-╰─────────────────────────────────────────────────────────────────────────────╯
-```
 
-Pressing **Esc** with unsaved changes opens a confirmation dialog listing every modified value (e.g. `~ thresholds.ctx.warn: 60 -> 55`, `~ bar_style: 'fill' -> 'dot'`). Choose **Save changes** or **Discard changes** — shortcuts `s` / `d` work too.
+![Main menu](screenshots/main.png)
 
 **Metrics visibility** — per-metric display mode
-```
-╭───────────────────────── Metrics visibility ───────────────────────╮
-│                                                                    │
-│   selected model: Sonnet 4.6                                       │
-│                                                                    │
-│   metric    bar       text      both      off                      │
-│                                                                    │
-│   model     ( )       (*)       ( )       ( )                      │
-│   effort    (*)       ( )       ( )       ( )                      │
-│   thinking  ( )       (*)       ( )       ( )                      │
-│   context   (*)       ( )       ( )       ( )                      │
-│   tokens    ( )       (*)       ( )       ( )                      │
-│   5h        (*)       ( )       ( )       ( )                      │
-│   7d        (*)       ( )       ( )       ( )                      │
-│                                                                    │
-│   ↑↓ metric  ←→ mode  b/t/h/o set  esc back                        │
-╰────────────────────────────────────────────────────────────────────╯
-```
+
+![Metrics visibility](screenshots/metrics.png)
 
 **Thresholds**
-```
-╭───────────────────── Metrics thresholds ────────────────────────────╮
-│                                                                     │
-│  context warn: [ 60]%          crit: [ 80]%                         │
-│  tokens  warn: [ 60]%          crit: [ 80]%                         │
-│  5h      warn: [ 60]%          crit: [ 80]%                         │
-│  7d      warn: [ 60]%          crit: [ 80]%                         │
-│                                                                     │
-│  ↑↓ row  ←→ field  +/- ±1  PgUp/Dn ±5  0-9 type  esc back           │
-╰─────────────────────────────────────────────────────────────────────╯
-```
 
-**Git visibility** (line 2)
-```
-╭──────────────── Git visibility ────────────────╮
-│                                                │
-│  [x] dir                                       │
-│  [x] branch                                    │
-│  [x] worktree                                  │
-│                                                │
-│  ↑↓ navigate  Spc/Ent toggle  esc back         │
-╰────────────────────────────────────────────────╯
-```
+![Thresholds](screenshots/thresholds.png)
+
+**Git visibility**
+
+![Git visibility](screenshots/git.png)
 
 **Decoration**
-```
-╭──────────────────────── Decoration ─────────────────────────╮
-│                                                             │
-│   Prefix shown in front of each segment (all display modes):│
-│                                                             │
-│     (*) emoji   🤖 💪 🧠 📦 🎫 🕔 📆                       │
-│     ( ) label   model effort thinking ctx tkn 5h 7d         │
-│                                                             │
-│   ↑↓ choose  Ent/Spc select  esc back                       │
-╰─────────────────────────────────────────────────────────────╯
-```
+
+![Decoration](screenshots/decoration.png)
 
 **Bar style**
-```
-╭──────────────────────── Bar style ──────────────────────────╮
-│                                                             │
-│   Glyphs used for filled / empty bar segments:              │
-│                                                             │
-│     ( ) fill     ▰▰▰▰▰▱▱▱▱▱                                 │
-│     ( ) block    █████░░░░░                                 │
-│     (*) dot      ●●●●●○○○○○   (default)                     │
-│     ( ) square   ■■■■■□□□□□                                 │
-│                                                             │
-│   ↑↓ choose  Ent/Spc select  esc back                       │
-╰─────────────────────────────────────────────────────────────╯
-```
+
+![Bar style](screenshots/bar_style.png)
 
 
 **Update checks**
-```
-╭──────────────────────── Update checks ──────────────────────╮
-│                                                             │
-│   How often to check GitHub for a new release               │
-│   installed: 0.1.0    latest: 0.1.0                         │
-│                                                             │
-│     ( ) never     no update checks                          │
-│     ( ) daily     check once per day                        │
-│     (*) weekly    check once per week                       │
-│     ( ) monthly   check once per month                      │
-│                                                             │
-│   ↑↓ choose  Ent/Spc select  esc back                       │
-╰─────────────────────────────────────────────────────────────╯
-```
 
-When a newer release is available on GitHub, a small **🔔 v0.1.1 available** segment is appended to line 2 and a banner appears in the TUI's main menu. The check runs in a background thread (3 s timeout) so the status line never blocks. Result is cached in `~/.claude/statusline_update.json`. Default interval: `weekly`.
+![Update checks](screenshots/updates.png)
+
+- When a newer release is available on GitHub, a small **🔔 v0.1.1 available** segment is appended to line 2 - also a banner appears in the TUI's main menu.  
+- The check runs in a background thread (3 s timeout) so the status line never blocks.  
+- Result is cached in `~/.claude/statusline_update.json`. Default interval: `weekly`.
 
 
 ## Files

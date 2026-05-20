@@ -25,6 +25,7 @@ REPO = Path(__file__).resolve().parent.parent
 STATUSLINE = REPO / "scripts" / "statusline.py"
 CONFIG_PATH   = Path.home() / ".claude" / "statusline_config.json"
 SETTINGS_PATH = Path.home() / ".claude" / "settings.json"
+UPDATE_CACHE  = Path.home() / ".claude" / "statusline_update.json"
 
 ESC = "\x1b"
 RESET = f"{ESC}[0m"
@@ -198,6 +199,24 @@ def run_small() -> None:
     print(render(cfg, make_input("Haiku 4.5", "low", SCENARIOS["low"]), thinking=False))
     print()
 
+    section("6. update available banner")
+    cfg = {"decoration": "emoji", "bar_style": "fill", "metrics": all_metrics("both")}
+    update_backup = UPDATE_CACHE.read_text(encoding="utf-8") if UPDATE_CACHE.exists() else None
+    UPDATE_CACHE.write_text(json.dumps({
+        "update_available": True,
+        "current_version": "0.1.1",
+        "latest_version": "0.1.2",
+    }), encoding="utf-8")
+    print(render(cfg, make_input("Sonnet 4.6", "high", SCENARIOS["medium"]), thinking=False))
+    if update_backup is not None:
+        UPDATE_CACHE.write_text(update_backup, encoding="utf-8")
+    else:
+        try:
+            UPDATE_CACHE.unlink()
+        except FileNotFoundError:
+            pass
+    print()
+
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Render status line preview variations.")
@@ -207,6 +226,7 @@ def main() -> None:
 
     backup_cfg = CONFIG_PATH.read_text(encoding="utf-8") if CONFIG_PATH.exists() else None
     backup_set = SETTINGS_PATH.read_text(encoding="utf-8") if SETTINGS_PATH.exists() else None
+    backup_upd = UPDATE_CACHE.read_text(encoding="utf-8") if UPDATE_CACHE.exists() else None
     try:
         print(f"{BOLD}Claude Code Status Line — Preview{RESET}")
         if args.small:
@@ -216,7 +236,7 @@ def main() -> None:
             print(f"{DIM}Renders every relevant variation. Screenshot freely.{RESET}")
             run_full()
     finally:
-        for path, backup in ((CONFIG_PATH, backup_cfg), (SETTINGS_PATH, backup_set)):
+        for path, backup in ((CONFIG_PATH, backup_cfg), (SETTINGS_PATH, backup_set), (UPDATE_CACHE, backup_upd)):
             if backup is not None:
                 path.write_text(backup, encoding="utf-8")
             else:

@@ -505,7 +505,8 @@ def update_hint_segment(config: dict) -> str | None:
     tag = str(latest)
     if not tag.startswith(("v", "V")):
         tag = f"v{tag}"
-    return f"{DIM_GRAY}🔔 {tag} available{RESET}"
+    INFO_BLUE = f"{ESC}[38;5;81m"
+    return f"{INFO_BLUE}🔔 {tag} available{RESET}"
 
 
 def main() -> None:

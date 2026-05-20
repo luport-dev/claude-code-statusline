@@ -40,8 +40,11 @@ function main() {
     process.exit(1);
   }
 
+  // Force UTF-8 so the TUI's box-drawing chars and emojis render instead of
+  // tofu (◇◇) — Windows Python otherwise starts on the legacy cp1252 codec.
   const r = spawnSync(python, [SETTINGS_PY, ...process.argv.slice(2)], {
     stdio: "inherit",
+    env: { ...process.env, PYTHONIOENCODING: "utf-8", PYTHONUTF8: "1" },
   });
   process.exit(r.status === null ? 1 : r.status);
 }
