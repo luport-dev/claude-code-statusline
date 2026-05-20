@@ -222,7 +222,7 @@ def maybe_trigger_update_check() -> None:
 
 
 def write_update_cache_version() -> None:
-    """Seed/refresh the update cache's current_version on install."""
+    """Seed/refresh the update cache's current_version and re-evaluate update_available."""
     try:
         data: dict = {}
         if UPDATE_CACHE.exists():
@@ -231,7 +231,13 @@ def write_update_cache_version() -> None:
                     data = json.load(f) or {}
             except Exception:
                 data = {}
-        data["current_version"] = _read_package_version()
+        current = _read_package_version()
+        data["current_version"] = current
+        # Re-evaluate the stale update flag against the last known latest version,
+        # so bumping current_version past latest clears a leftover "update available".
+        latest = data.get("latest_version")
+        if latest:
+            data["update_available"] = _parse_version(str(latest)) > _parse_version(current)
         UPDATE_CACHE.parent.mkdir(parents=True, exist_ok=True)
         with UPDATE_CACHE.open("w", encoding="utf-8") as f:
             json.dump(data, f, indent=2)
