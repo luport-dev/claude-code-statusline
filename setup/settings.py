@@ -179,7 +179,10 @@ def _update_check_worker() -> None:
 
 
 def maybe_trigger_update_check() -> None:
-    """Start a background thread to refresh the update cache if the interval has elapsed."""
+    """Start a background thread to refresh the update cache if the interval has elapsed.
+
+    Returns the thread so the caller can join() it after the TUI exits.
+    """
     try:
         data: dict = {}
         if UPDATE_CACHE.exists():
@@ -193,12 +196,13 @@ def maybe_trigger_update_check() -> None:
                 last_dt = last_dt.replace(tzinfo=datetime.timezone.utc)
             interval = _UPDATE_INTERVALS_SEC.get("weekly", 604800)
             if (datetime.datetime.now(datetime.timezone.utc) - last_dt).total_seconds() < interval:
-                return
+                return None
     except Exception:
         pass
     import threading
     t = threading.Thread(target=_update_check_worker, daemon=True)
     t.start()
+    return t  # type: ignore[return-value]
 
 
 def write_update_cache_version() -> None:
@@ -594,15 +598,13 @@ def main_menu(stdscr: "curses.window", config: dict, original: dict) -> tuple[di
                 tag = f"v{tag}"
             hint_text = glyph(f"🔔  Update available: {tag}")
 
-        draw_divider(stdscr, h - 5)
         if hint_text:
-            safe_addstr(stdscr, h - 4, max(2, (w - len(hint_text)) // 2), hint_text, _attr(CP_WARN, bold=True))
-            path_text = f"{CONFIG_PATH}"
-            safe_addstr(stdscr, h - 3, max(2, (w - len(path_text)) // 2), path_text, _attr(CP_DIM))
-        else:
-            path_text = f"{CONFIG_PATH}"
-            safe_addstr(stdscr, h - 4, max(2, (w - len(path_text)) // 2), path_text, _attr(CP_DIM))
+            safe_addstr(stdscr, h - 6, max(2, (w - len(hint_text)) // 2), hint_text, _attr(CP_WARN, bold=True))
 
+        draw_divider(stdscr, h - 5)
+        path_text = f"{CONFIG_PATH}"
+        safe_addstr(stdscr, h - 4, max(2, (w - len(path_text)) // 2), path_text, _attr(CP_DIM))
+        # h - 3 bleibt leer
         draw_hint_pills(stdscr, h - 2, [
             ("↑↓",  "navigate"),
             ("Ent", "open"),
@@ -1245,8 +1247,10 @@ if __name__ == "__main__":
     except ImportError:
         print("ERROR: curses not available. On Windows: pip install windows-curses")
         raise SystemExit(1)
-    maybe_trigger_update_check()
+    update_thread = maybe_trigger_update_check()
     curses.wrapper(run)
+    if update_thread is not None:
+        update_thread.join(timeout=5)
     if _save_result:
         refreshed = refresh_install()
         if refreshed:
