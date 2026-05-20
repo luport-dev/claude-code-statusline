@@ -188,6 +188,10 @@ def maybe_trigger_update_check() -> None:
         if UPDATE_CACHE.exists():
             with UPDATE_CACHE.open(encoding="utf-8") as f:
                 data = json.load(f) or {}
+        # If current_version changed (new install), reset last_checked so we re-check immediately.
+        current = _read_package_version()
+        if str(data.get("current_version", "")) != current:
+            data.pop("last_checked", None)
         last = data.get("last_checked")
         if last:
             import datetime
