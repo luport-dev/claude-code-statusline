@@ -23,6 +23,29 @@ function findPython() {
   return null;
 }
 
+function ensureWindowsCurses(python) {
+  // Windows Python ships without the _curses C extension. Probe first; only
+  // shell out to pip if the import actually fails, so we don't slow down the
+  // normal path.
+  const probe = spawnSync(python, ["-c", "import _curses"], { stdio: "ignore" });
+  if (probe.status === 0) return true;
+
+  console.error("Installing windows-curses (one-time setup)...");
+  const install = spawnSync(
+    python,
+    ["-m", "pip", "install", "--quiet", "--disable-pip-version-check", "windows-curses"],
+    { stdio: "inherit" },
+  );
+  if (install.status !== 0) {
+    console.error("");
+    console.error("Failed to install windows-curses automatically.");
+    console.error("Run this manually, then re-run the installer:");
+    console.error("  " + python + " -m pip install windows-curses");
+    return false;
+  }
+  return true;
+}
+
 function main() {
   if (!fs.existsSync(SETTINGS_PY)) {
     console.error("Error: settings.py not found in package payload.");
@@ -37,6 +60,10 @@ function main() {
     if (process.platform === "win32") {
       console.error("Also install: pip install windows-curses");
     }
+    process.exit(1);
+  }
+
+  if (process.platform === "win32" && !ensureWindowsCurses(python)) {
     process.exit(1);
   }
 

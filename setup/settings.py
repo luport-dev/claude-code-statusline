@@ -6,7 +6,24 @@ Requires: curses (stdlib on Linux/macOS)
 """
 from __future__ import annotations
 
-import curses
+try:
+    import curses
+except ImportError:
+    import platform as _platform
+    import sys as _sys
+    if _platform.system() == "Windows":
+        _sys.stderr.write(
+            "ERROR: The 'curses' module is unavailable on this Python.\n"
+            "On Windows, install the windows-curses backport:\n"
+            "    " + _sys.executable + " -m pip install windows-curses\n"
+            "Then re-run this command.\n"
+        )
+    else:
+        _sys.stderr.write(
+            "ERROR: The 'curses' module is unavailable on this Python build.\n"
+            "Install a Python distribution that includes curses and try again.\n"
+        )
+    raise SystemExit(1)
 import json
 import os
 import platform
@@ -1324,11 +1341,6 @@ def refresh_install() -> bool:
 
 
 if __name__ == "__main__":
-    try:
-        import curses as _check  # noqa: F401
-    except ImportError:
-        print("ERROR: curses not available. On Windows: pip install windows-curses")
-        raise SystemExit(1)
     # Only write current_version when running from the npm payload. In repo/dev
     # mode we skip it to avoid polluting the cache with the unpublished version.
     if _is_npm_payload():
