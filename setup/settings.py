@@ -599,28 +599,76 @@ def show_flash(stdscr: "curses.window", msg: str, attr: int) -> None:
     stdscr.getch()
 
 
+class UpdateRequested(Exception):
+    """Raised when the user confirms an in-TUI update; caught in __main__."""
+
+
 def do_update(stdscr: "curses.window") -> None:
-    """Show the command the user needs to run to update."""
-    stdscr.clear()
-    h, w = stdscr.getmaxyx()
-    draw_box(stdscr, "How to update")
-    cmd = "npx -y @luport-dev/claude-code-statusline"
-    lines = [
-        "Close this TUI and run the following command:",
-        "",
-        cmd,
-        "",
-        "This will download the latest version and open",
-        "the settings TUI again to complete the update.",
-    ]
-    y0 = max(2, h // 2 - len(lines) // 2)
-    for i, line in enumerate(lines):
-        attr = _attr(CP_ACCENT, bold=True) if line == cmd else _attr(CP_DIM)
-        safe_addstr(stdscr, y0 + i, max(2, (w - len(line)) // 2), line, attr)
-    hint = "Press any key to go back"
-    safe_addstr(stdscr, h - 3, max(2, (w - len(hint)) // 2), hint, _attr(CP_DIM))
-    stdscr.refresh()
-    stdscr.getch()
+    """Confirm with the user, then signal the Node wrapper to perform the update."""
+    cache = load_update_cache()
+    latest = str(cache.get("latest_version") or "")
+    tag = latest if latest.startswith(("v", "V")) else (f"v{latest}" if latest else "")
+
+    curses.curs_set(0)
+    stdscr.keypad(True)
+    selected = 0  # 0 = update, 1 = cancel
+    options = [("Update now", True), ("Cancel", False)]
+
+    while True:
+        stdscr.clear()
+        h, w = stdscr.getmaxyx()
+        draw_box(stdscr, "Update")
+
+        title = f"⬆  Update to {tag}" if tag else "⬆  Update available"
+        safe_addstr(stdscr, 2, max(2, (w - len(title)) // 2), glyph(title), _attr(CP_WARN, bold=True))
+
+        lines = [
+            "The TUI will close, run the update, and reopen.",
+            "",
+            "Global install:  npm i -g @luport-dev/claude-code-statusline@latest",
+            "npx mode:        npx -y @luport-dev/claude-code-statusline@latest",
+        ]
+        y0 = max(4, h // 2 - len(lines) // 2 - 1)
+        for i, line in enumerate(lines):
+            attr = _attr(CP_ACCENT) if line.strip().startswith(("npm ", "npx ")) else _attr(CP_DIM)
+            safe_addstr(stdscr, y0 + i, max(2, (w - len(line)) // 2), line, attr)
+
+        y_opts = h - 4
+        opt_strs = []
+        for i, (label_, _) in enumerate(options):
+            marker = "> " if i == selected else "  "
+            opt_strs.append(f"{marker}{label_}  ")
+        opts_total = sum(len(s) for s in opt_strs) + 4 * (len(opt_strs) - 1)
+        x = max(2, (w - opts_total) // 2)
+        for i, opt_str in enumerate(opt_strs):
+            if i == selected:
+                attr = _attr(CP_OK if options[i][1] else CP_DANGER, bold=True)
+            else:
+                attr = _attr(CP_DIM)
+            safe_addstr(stdscr, y_opts, x, opt_str, attr)
+            x += len(opt_str) + 4
+
+        draw_hint_pills(stdscr, h - 2, [
+            ("←→",  "choose"),
+            ("Ent", "confirm"),
+            ("y",   "update"),
+            ("n",   "cancel"),
+        ])
+        stdscr.refresh()
+
+        key = stdscr.getch()
+        if key in (curses.KEY_LEFT, curses.KEY_UP):
+            selected = (selected - 1) % len(options)
+        elif key in (curses.KEY_RIGHT, curses.KEY_DOWN):
+            selected = (selected + 1) % len(options)
+        elif key in (ord("y"), ord("Y")):
+            raise UpdateRequested
+        elif key in (ord("n"), ord("N"), 27):
+            return
+        elif key in (curses.KEY_ENTER, ord("\n"), ord("\r")):
+            if options[selected][1]:
+                raise UpdateRequested
+            return
 
 
 def main_menu(stdscr: "curses.window", config: dict, original: dict) -> tuple[dict, bool]:
@@ -1351,7 +1399,15 @@ if __name__ == "__main__":
             if ok:
                 print("statusline.py updated.")
     update_thread = maybe_trigger_update_check()
-    curses.wrapper(run)
+    try:
+        curses.wrapper(run)
+    except UpdateRequested:
+        # Signal the Node wrapper (cli.js) to perform the actual update.
+        # Exit code 75 is the agreed contract; cli.js spawns the right npm/npx
+        # command, then re-launches the TUI.
+        if update_thread is not None:
+            update_thread.join(timeout=5)
+        sys.exit(75)
     if update_thread is not None:
         update_thread.join(timeout=5)
     if _save_result:
